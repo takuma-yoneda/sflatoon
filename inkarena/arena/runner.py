@@ -55,7 +55,8 @@ def _player(spec: str, seed: int, sandbox: bool):
 
 def play(job: Job) -> dict:
     team_specs = (job.bot_b, job.bot_a) if job.swapped else (job.bot_a, job.bot_b)
-    players = [_player(spec, job.seed, job.sandbox) for spec in team_specs]
+    # Each side gets its own bot seed so a bot playing itself doesn't mirror its moves.
+    players = [_player(spec, 2 * job.seed + t, job.sandbox) for t, spec in enumerate(team_specs)]
     try:
         r = run_match(
             load_map(job.map_name), players[0], players[1], seed=job.seed, record=bool(job.out_dir)

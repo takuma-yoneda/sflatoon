@@ -2,7 +2,8 @@
 
 1. Ink < 20: go to the nearest own-ink cell and stay submerged until refilled.
 2. Enemy visible and in range: aim at it and fire.
-3. Otherwise: walk to the nearest non-own cell, firing along the movement direction.
+3. Otherwise: walk to a near non-own cell, firing along the movement direction. Ties
+   (cells within one step of the nearest) are broken at random from ``seed``.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ class Policy:
         self.target: list[tuple[int, int] | None] = []
         self.age: list[int] = []
         self.paintable = None
+        self.rng = np.random.default_rng(seed)
 
     def act(self, obs):
         walls, ink = obs["walls"], obs["ink"]
@@ -83,7 +85,7 @@ class Policy:
         self.age[i] += 1
         stale = t is None or not goal_mask[t[1], t[0]] or self.age[i] >= RETARGET_EVERY
         if stale or not self.waypoints[i]:
-            t = h.nearest(goal_mask, pos, walls)
+            t = self._pick(goal_mask, pos, walls)
             self.target[i], self.age[i] = t, 0
             self.waypoints[i] = h.path(walls, pos, h.center_of(t)) if t else []
             if t and not self.waypoints[i]:
@@ -96,6 +98,17 @@ class Policy:
         dx, dy = wps[0][0] - pos[0], wps[0][1] - pos[1]
         n = math.hypot(dx, dy)
         return (dx / n, dy / n)
+
+    def _pick(self, goal_mask, pos, walls):
+        """A random goal cell among those within one step of the nearest one."""
+        dist = h.distance_field(walls, [h.cell_of(pos)])
+        dist = np.where(goal_mask, dist, h.UNREACHABLE)
+        best = dist.min()
+        if best == h.UNREACHABLE:
+            return None
+        ys, xs = np.nonzero(dist <= best + 1)
+        i = self.rng.integers(len(xs))
+        return int(xs[i]), int(ys[i])
 
 
 def _noop(me):
