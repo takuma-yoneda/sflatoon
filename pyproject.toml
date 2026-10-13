@@ -14,12 +14,13 @@ dependencies = ["numpy>=1.26", "pillow>=10.1"]
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
 video = ["imageio-ffmpeg>=0.5"]
+harness = ["anthropic>=1.0"]
 
 [tool.setuptools.packages.find]
 include = ["inkarena*"]
 
 [tool.setuptools.package-data]
-"inkarena" = ["maps/*.txt"]
+"inkarena" = ["maps/*.txt", "harness/prompts/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
