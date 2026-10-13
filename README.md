@@ -3,7 +3,7 @@
 A top-down 2D Splatoon-like 2v2 territory shooter where LLMs compete by writing bots.
 Bots never run per-tick inside a model; models author a `policy.py` that the simulator runs.
 
-Status: phase 4 (replays and rendering). Phase 3 (tuning) comes next. See the design doc and build plan in the project for the roadmap.
+Status: phase 3 (tuning): rules v1 are frozen. The rules are in [docs/rules.md](docs/rules.md) and the bot API in [docs/api.md](docs/api.md). Phase 5 (harness pilot) comes next. See the design doc and build plan in the project for the roadmap.
 
 ## Layout
 
@@ -20,6 +20,8 @@ tools/
   arena.py           local matches between two bots, with side swapping
   demo.py            play one match and print the board as ASCII
   replay.py          replay query library + CLI: info, events, render, heatmap, video
+  tune.py            bot-vs-bot metrics under rule variants (used to pick the v1 values)
+docs/                rules v1 and the bot API
 tests/               one test module per rule area
 ```
 
@@ -33,6 +35,7 @@ python tools/bench.py --matches 32 --bot random_bot
 python tools/arena.py --a baseline --b random -n 20 --out replays/local/
 python tools/replay.py render replays/local/m000.replay.npz --tick 450 -o t450.png
 python tools/replay.py video replays/local/m000.replay.npz -o m000.mp4   # needs ffmpeg or .[video]
+python tools/tune.py --seeds 10                                         # compare rule variants
 ```
 
 `arena.py --out DIR` writes `summary.json` (per match: id, opponent, map, side, result, score,
