@@ -1,9 +1,9 @@
 # Ink Arena (sflatoon)
 
-A top-down 2D Splatoon-like 3v3 territory shooter where LLMs compete by writing bots.
+A top-down 2D Splatoon-like 2v2 territory shooter where LLMs compete by writing bots.
 Bots never run per-tick inside a model; models author a `policy.py` that the simulator runs.
 
-Status: phase 2 (bots and arena). See the design doc and build plan in the project for the roadmap.
+Status: phase 4 (replays and rendering). Phase 3 (tuning) comes next. See the design doc and build plan in the project for the roadmap.
 
 ## Layout
 
@@ -12,13 +12,14 @@ inkarena/
   sim/        numpy simulator: rules (config.py), maps, tick engine, team frame transform
   bots/       house bots (noop, random, baseline) and the bot helper library (helpers.py)
   arena/      bot loader, subprocess sandbox, match runner
-  replay/     replays (phase 1: seed + map + applied actions)
-  maps/       bundled ASCII maps (64x40, 180-degree symmetric)
+  replay/     replay recorder (.npz + events.jsonl), query library, PNG/heatmap/MP4 renderer
+  maps/       bundled ASCII maps (32x20, 180-degree symmetric)
 tools/
   validate_maps.py   check map symmetry and reachability
   bench.py           matches/min across worker processes
   arena.py           local matches between two bots, with side swapping
   demo.py            play one match and print the board as ASCII
+  replay.py          replay query library + CLI: info, events, render, heatmap, video
 tests/               one test module per rule area
 ```
 
@@ -30,7 +31,13 @@ pytest -q
 python tools/validate_maps.py
 python tools/bench.py --matches 32 --bot random_bot
 python tools/arena.py --a baseline --b random -n 20 --out replays/local/
+python tools/replay.py render replays/local/m000.replay.npz --tick 450 -o t450.png
+python tools/replay.py video replays/local/m000.replay.npz -o m000.mp4   # needs ffmpeg or .[video]
 ```
+
+`arena.py --out DIR` writes `summary.json` (per match: id, opponent, map, side, result, score,
+coverage every 10 s) plus `mNNN.replay.npz` and `mNNN.events.jsonl` per match. Replay arrays and
+event fields are documented in `inkarena/replay/recorder.py`.
 
 A bot is a directory with `policy.py` defining `Policy(seed)` with `act(obs) -> list[dict]`
 (design doc section 3). Bots run in a subprocess: 1 s CPU for setup, 50 ms CPU hard limit per
@@ -47,6 +54,9 @@ print(result.score, result.winner)
 ```
 
 ## Simulator notes
+
+- Current format: 2v2, 60 s matches (600 ticks), 32x20 maps. Team size and match length are
+  `Rules.team_size` and `Rules.ticks`; a map needs at least `team_size` spawn digits (`1`, `2`, ...).
 
 - Tick order follows design doc §4; each step is one method of `inkarena.sim.engine.Game`.
 - Arrays are indexed `[y, x]`; map files list rows top to bottom, so line `y`, column `x` is cell

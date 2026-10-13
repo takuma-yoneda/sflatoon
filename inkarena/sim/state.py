@@ -1,4 +1,4 @@
-"""Simulator state. Agents 0-2 are team A, agents 3-5 are team B.
+"""Simulator state. With m agents per team, agents 0..m-1 are team A and m..2m-1 team B.
 
 All positions and angles here are in the absolute (team A) frame.
 """
@@ -29,23 +29,23 @@ class Projectile:
 @dataclass
 class State:
     tick: int  # ticks simulated so far; the next step simulates this tick
-    pos: np.ndarray  # float64[6, 2]
-    facing: np.ndarray  # float64[6], radians in [0, 2*pi)
-    hp: np.ndarray  # int64[6]
-    ink: np.ndarray  # float64[6]
-    submerged: np.ndarray  # bool[6]
-    alive: np.ndarray  # bool[6]
-    respawn_in: np.ndarray  # int64[6], ticks until respawn (dead agents)
-    invisible: np.ndarray  # int64[6], ticks of respawn invisibility left
-    next_fire: np.ndarray  # int64[6], first tick the agent may fire again
-    last_shot: np.ndarray  # int64[6]
-    last_damage: np.ndarray  # int64[6]
+    pos: np.ndarray  # float64[n, 2]
+    facing: np.ndarray  # float64[n], radians in [0, 2*pi)
+    hp: np.ndarray  # int64[n]
+    ink: np.ndarray  # float64[n]
+    submerged: np.ndarray  # bool[n]
+    alive: np.ndarray  # bool[n]
+    respawn_in: np.ndarray  # int64[n], ticks until respawn (dead agents)
+    invisible: np.ndarray  # int64[n], ticks of respawn invisibility left
+    next_fire: np.ndarray  # int64[n], first tick the agent may fire again
+    last_shot: np.ndarray  # int64[n]
+    last_damage: np.ndarray  # int64[n]
     grid: np.ndarray  # int8[H, W] ink: +1 team A, -1 team B, 0 empty
     projectiles: list[Projectile] = field(default_factory=list)
-    visible: np.ndarray = field(default_factory=lambda: np.zeros((2, 3), dtype=bool))
+    visible: np.ndarray = None  # bool[2, m]: team t sees the other team's agent j
     score: tuple[int, int] = (0, 0)
-    kills: np.ndarray = field(default_factory=lambda: np.zeros(6, dtype=np.int64))
-    deaths: np.ndarray = field(default_factory=lambda: np.zeros(6, dtype=np.int64))
+    kills: np.ndarray = None  # int64[n]
+    deaths: np.ndarray = None  # int64[n]
 
     def digest(self) -> str:
         """Hash of everything that affects future ticks, for determinism checks."""
@@ -75,8 +75,9 @@ class State:
 
 
 def initial_state(m: Map, rules: Rules) -> State:
-    n = 2 * rules.team_size
-    pos = np.concatenate([m.spawns[0], m.spawns[1]]).astype(float)
+    size = rules.team_size
+    n = 2 * size
+    pos = np.concatenate([m.spawns[0, :size], m.spawns[1, :size]]).astype(float)
     cx, cy = m.center
     facing = np.arctan2(cy - pos[:, 1], cx - pos[:, 0]) % (2 * np.pi)
     return State(
@@ -93,4 +94,7 @@ def initial_state(m: Map, rules: Rules) -> State:
         last_shot=np.full(n, NEVER, dtype=np.int64),
         last_damage=np.full(n, NEVER, dtype=np.int64),
         grid=m.base.copy(),
+        visible=np.zeros((2, size), dtype=bool),
+        kills=np.zeros(n, dtype=np.int64),
+        deaths=np.zeros(n, dtype=np.int64),
     )

@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from multiprocessing import Pool
 from pathlib import Path
 
-from ..replay import ActionReplay, save_replay
 from ..sim import load_map, run_match
 from ..sim.match import InProcessPlayer
 from .loader import label, load_policy_class, resolve
@@ -58,7 +57,9 @@ def play(job: Job) -> dict:
     team_specs = (job.bot_b, job.bot_a) if job.swapped else (job.bot_a, job.bot_b)
     players = [_player(spec, job.seed, job.sandbox) for spec in team_specs]
     try:
-        r = run_match(load_map(job.map_name), players[0], players[1], seed=job.seed)
+        r = run_match(
+            load_map(job.map_name), players[0], players[1], seed=job.seed, record=bool(job.out_dir)
+        )
     finally:
         for p in players:
             if hasattr(p, "close"):
@@ -86,9 +87,11 @@ def play(job: Job) -> dict:
     if job.out_dir:
         out = Path(job.out_dir)
         out.mkdir(parents=True, exist_ok=True)
-        save_replay(
-            out / f"{job.match_id}.replay.npz", ActionReplay(job.seed, job.map_name, r.actions)
-        )
+        r.recorder.save(out / f"{job.match_id}.replay.npz", out / f"{job.match_id}.events.jsonl")
+        # [seconds, ours, theirs] every 10 s
+        summary["coverage"] = [
+            [t // 10, *((a, b) if side == 0 else (b, a))] for t, a, b in r.recorder.coverage()
+        ]
     return summary
 
 

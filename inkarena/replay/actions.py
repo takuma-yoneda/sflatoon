@@ -17,7 +17,7 @@ from ..sim.maps import Map, load_map
 class ActionReplay:
     seed: int
     map_name: str
-    actions: np.ndarray  # float[T, 6, 5]
+    actions: np.ndarray  # float[T, n, 5]
 
 
 def save_replay(path: str | Path, replay: ActionReplay) -> None:

@@ -10,13 +10,13 @@ def test_bundled_maps_load_and_validate():
     assert len(names) >= 2
     for name in names:
         m = load_map(name)
-        assert (m.width, m.height) == (64, 40)
+        assert (m.width, m.height) == (32, 20)
         assert m.walls[0].all() and m.walls[-1].all()
         assert m.walls[:, 0].all() and m.walls[:, -1].all()
 
 
 def test_spawns_are_rotated_for_team_b():
-    m = load_map("crossroads")
+    m = load_map("duel")
     for (ax, ay), (bx, by) in zip(m.spawns[0], m.spawns[1], strict=True):
         assert (bx, by) == (m.width - ax, m.height - ay)
         assert m.base[int(ay), int(ax)] == 1
@@ -60,7 +60,7 @@ def test_spawn_must_be_unique():
 def test_wrong_size_rejected():
     m = parse_map(open_map_text())
     with pytest.raises(MapError, match="size"):
-        validate_map(m, size=(64, 40))
+        validate_map(m, size=(32, 20))
     assert m.walls.shape == (H, W)
 
 

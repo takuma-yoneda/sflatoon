@@ -5,8 +5,9 @@ column ``x`` is cell ``(x, y)``. Symbols:
 
 - ``#`` wall, ``.`` floor
 - ``a`` / ``b`` base cells of team A / team B
-- ``1``-``3`` team A spawn points (also team A base cells). Team B's spawns are
-  the 180-degree images of these and are written as ``b`` in the file.
+- ``1``, ``2``, ... team A spawn points (also team A base cells), numbered from 1
+  with no gaps. Team B's spawns are the 180-degree images of these and are
+  written as ``b`` in the file.
 
 The map border always counts as wall, whether or not it is drawn. A map is valid
 when its 180-degree rotation equals itself with teams swapped, and every
@@ -24,8 +25,8 @@ import numpy as np
 MAP_DIR = Path(__file__).resolve().parent.parent / "maps"
 
 WALL, FLOOR, BASE_A, BASE_B = "#", ".", "a", "b"
-SPAWN_CHARS = "123"
-STANDARD_SIZE = (64, 40)
+SPAWN_CHARS = "123456789"
+STANDARD_SIZE = (32, 20)
 
 
 class MapError(ValueError):
@@ -39,7 +40,7 @@ class Map:
     name: str
     walls: np.ndarray  # bool[H, W]
     base: np.ndarray  # int8[H, W]: +1 team A base, -1 team B base, 0 otherwise
-    spawns: np.ndarray  # float[2, 3, 2]: team, index, (x, y) at cell centres
+    spawns: np.ndarray  # float[2, k, 2]: team, index, (x, y) at cell centres
 
     @property
     def width(self) -> int:
@@ -83,8 +84,11 @@ def parse_map(text: str, name: str = "<string>", validate: bool = True) -> Map:
     base[grid == BASE_B] = -1
     base[walls] = 0
 
-    spawns = np.zeros((2, 3, 2))
-    for i, ch in enumerate(SPAWN_CHARS):
+    present = [ch for ch in SPAWN_CHARS if (grid == ch).any()]
+    if not present or present != list(SPAWN_CHARS[: len(present)]):
+        raise MapError(f"{name}: spawns must be numbered 1..k with no gaps, found {present}")
+    spawns = np.zeros((2, len(present), 2))
+    for i, ch in enumerate(present):
         ys, xs = np.nonzero(grid == ch)
         if len(xs) != 1:
             raise MapError(f"{name}: spawn '{ch}' must appear exactly once, found {len(xs)}")
@@ -140,7 +144,7 @@ def _unreachable(walls: np.ndarray) -> list[tuple[int, int]]:
 
 
 def load_map(name_or_path: str | Path, validate: bool = True) -> Map:
-    """Load a bundled map by name (e.g. ``"crossroads"``) or from a file path."""
+    """Load a bundled map by name (e.g. ``"duel"``) or from a file path."""
     path = Path(name_or_path)
     if not path.suffix:
         path = MAP_DIR / f"{name_or_path}.txt"
