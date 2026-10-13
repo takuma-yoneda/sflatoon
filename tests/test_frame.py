@@ -72,6 +72,8 @@ def test_default_format_is_2v2_for_60_seconds():
     obs = g.observe(1)
     assert len(obs["team"]) == 2 and obs["ticks_left"] == 600
     assert g.state.visible.shape == (2, 2)
+    # Ranges are half the original 64x40 values, to match the half-size maps.
+    assert g.rules.view_range == 6.0 and g.rules.shot_range == 3.0
     noop = {"move": (0, 0), "aim": 0.0, "fire": False, "swim": False}
     g.step([noop] * 2, [noop] * 2)
     assert g.state.tick == 1

@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from ..sim.config import DEFAULT_RULES
 from ..sim.geometry import first_wall_t
 
 BAR = 64  # height of the top bar in pixels
@@ -25,9 +26,9 @@ TEAM = {
     0: {"agent": (226, 86, 0), "ink": (255, 192, 132), "base": (238, 150, 80), "name": "A"},
     1: {"agent": (72, 44, 214), "ink": (182, 168, 255), "base": (140, 120, 235), "name": "B"},
 }
-SHOT_SPEED = 1.5
-VIEW_RANGE = 12.0
-VIEW_HALF = math.radians(60)
+SHOT_SPEED = DEFAULT_RULES.shot_speed
+VIEW_RANGE = DEFAULT_RULES.view_range
+VIEW_HALF = DEFAULT_RULES.view_half_angle
 CONE_RAYS = 33
 SS = 3  # supersampling factor for agents and projectiles
 

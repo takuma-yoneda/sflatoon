@@ -36,7 +36,7 @@ class Rules:
 
     # Shots (tune)
     shot_speed: float = 1.5
-    shot_range: float = 6.0
+    shot_range: float = 3.0
     strip_halfwidth: float = 1.0
     splat_radius: float = 1.5
     shot_damage: int = 1
@@ -52,7 +52,7 @@ class Rules:
 
     # Visibility (tune)
     view_half_angle: float = math.radians(60)
-    view_range: float = 12.0
+    view_range: float = 6.0
     submerged_view_range: float = 2.0
 
     # Sandbox (used from phase 2)

@@ -14,7 +14,7 @@ import numpy as np
 from inkarena.bots import helpers as h
 
 LOW_INK, FULL_INK = 20.0, 95.0
-SHOT_RANGE = 6.0
+SHOT_RANGE = 3.0
 RETARGET_EVERY = 8
 
 
