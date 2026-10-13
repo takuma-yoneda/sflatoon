@@ -29,6 +29,80 @@ SHOT_SPEED = 1.5
 VIEW_RANGE = 12.0
 VIEW_HALF = math.radians(60)
 CONE_RAYS = 33
+SS = 3  # supersampling factor for agents and projectiles
+
+
+def _dark(c, k=0.6):
+    return tuple(int(v * k) for v in c)
+
+
+def _teardrop(x, y, f, r, nose, to_px, n=28):
+    """Polygon (pixels) of a disc of radius r whose front tapers to a point nose*r ahead."""
+    ux, uy = math.cos(f), math.sin(f)
+    tip = (x + ux * r * nose, y + uy * r * nose)
+    half = math.acos(1 / nose)  # tangent points seen from the tip
+    pts = [to_px(*tip)]
+    for i in range(n + 1):
+        a = f + half + (2 * math.pi - 2 * half) * i / n
+        pts.append(to_px(x + r * math.cos(a), y + r * math.sin(a)))
+    return pts
+
+
+def _swim_ripple(fr, d, x, y, f, team, tick):
+    """A dark puddle in the ink with an expanding ripple ring."""
+    S = fr.s * SS
+    col = TEAM[team]["agent"]
+    cx, cy = fr.pp(x, y)
+    phase = (tick / 8) % 1.0  # one ripple every 0.8 s
+    r = (0.3 + 0.35 * phase) * S
+    d.ellipse(
+        [cx - r, cy - r, cx + r, cy + r],
+        outline=col + (int(200 * (1 - phase)),),
+        width=int(0.06 * S),
+    )
+    fr._body(d, x, y, f, 0.24, _dark(col, 0.8) + (170,), nose=1.6)
+
+
+def _swim_fin(fr, d, x, y, f, team, tick):
+    """A small shark-fin wedge cutting through the ink, with a V wake behind it."""
+    S = fr.s * SS
+    col = TEAM[team]["agent"]
+    ux, uy = math.cos(f), math.sin(f)
+    vx, vy = -uy, ux
+    for side in (-1, 1):
+        a = fr.pp(x - ux * 0.1, y - uy * 0.1)
+        b = fr.pp(x - ux * 0.55 + side * vx * 0.35, y - uy * 0.55 + side * vy * 0.35)
+        d.line([a, b], fill=(255, 255, 255, 150), width=int(0.05 * S))
+    tip = fr.pp(x + ux * 0.32, y + uy * 0.32)
+    left = fr.pp(x - ux * 0.2 + vx * 0.16, y - uy * 0.2 + vy * 0.16)
+    rr = fr.pp(x - ux * 0.2 - vx * 0.16, y - uy * 0.2 - vy * 0.16)
+    d.polygon([tip, left, rr], fill=_dark(col, 0.7) + (235,))
+
+
+def _swim_eyes(fr, d, x, y, f, team, tick):
+    """Only two eyes peek out of the ink, looking where the agent faces."""
+    col = TEAM[team]["agent"]
+    ux, uy = math.cos(f), math.sin(f)
+    vx, vy = -uy, ux
+    fr._disc(d, x, y, 0.3, _dark(col, 0.85) + (110,))
+    for side in (-1, 1):
+        ex, ey = x + ux * 0.08 + side * vx * 0.14, y + uy * 0.08 + side * vy * 0.14
+        fr._disc(d, ex, ey, 0.1, (255, 255, 255, 240))
+        fr._disc(d, ex + ux * 0.04, ey + uy * 0.04, 0.05, (20, 20, 30, 255))
+
+
+def _swim_shadow(fr, d, x, y, f, team, tick):
+    """The body as a darker, translucent shadow under the ink surface."""
+    col = TEAM[team]["agent"]
+    fr._body(d, x, y, f, 0.36, _dark(col, 0.55) + (120,))
+
+
+SWIM_STYLES = {
+    "ripple": _swim_ripple,
+    "fin": _swim_fin,
+    "eyes": _swim_eyes,
+    "shadow": _swim_shadow,
+}
 
 
 def _font(size: int):
@@ -79,14 +153,16 @@ def _cone(m, x: float, y: float, facing: float) -> list[tuple[float, float]]:
 class _Frame:
     """Draws one frame from interpolated agent rows and projectiles."""
 
-    def __init__(self, replay, scale: int):
+    def __init__(self, replay, scale: int, swim_style: str = "ripple"):
         self.r = replay
         self.m = replay.map
         self.s = scale
         self.w = self.m.width * scale
         self.h = self.m.height * scale + BAR
         self.font = _font(max(11, int(scale * 0.45)))
+        self.font_ss = _font(max(11, int(scale * 0.45)) * SS)
         self.big = _font(20)
+        self.swim_style = swim_style
 
     def px(self, x, y):
         return x * self.s, y * self.s + BAR
@@ -120,74 +196,84 @@ class _Frame:
                     od.line(poly + [poly[0]], fill=TEAM[team]["agent"] + (90,), width=1)
             img = Image.alpha_composite(img, overlay)
 
-        overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-        d = ImageDraw.Draw(overlay)
+        # Agents and projectiles are drawn at SS x resolution and downsampled for anti-aliasing.
+        big = Image.new("RGBA", (self.w * SS, self.h * SS), (0, 0, 0, 0))
+        d = ImageDraw.Draw(big)
+        m = len(agents) // 2
         for x, y, dx, dy, owner in projectiles:
-            col = TEAM[int(owner) // (len(agents) // 2)]["agent"]
+            col = TEAM[int(owner) // m]["agent"]
             tx, ty = x - dx * 0.8, y - dy * 0.8
-            d.line([self.px(tx, ty), self.px(x, y)], fill=col + (140,), width=max(2, s // 5))
-            r = 0.22 * s
-            cx, cy = self.px(x, y)
-            d.ellipse(
-                [cx - r, cy - r, cx + r, cy + r], fill=col + (255,), outline=(20, 20, 20, 255)
-            )
-
+            d.line([self.pp(tx, ty), self.pp(x, y)], fill=col + (130,), width=int(0.16 * s * SS))
+            self._disc(d, x, y, 0.2, col + (255,))
         for k in range(len(agents)):
-            self._agent(d, k, len(agents) // 2, agents[k], int(respawn_in[k]))
+            self._agent(d, k, m, agents[k], int(respawn_in[k]), tick)
+        overlay = big.resize((self.w, self.h), Image.LANCZOS)
         img = Image.alpha_composite(img, overlay)
         self._bar(ImageDraw.Draw(img), score, tick)
         return img.convert("RGB")
 
-    def _agent(self, d, k, m, row, respawn_in):
-        s = self.s
+    # Supersampled drawing helpers (cell units in, SS-scaled pixels out).
+    def pp(self, x, y):
+        return x * self.s * SS, (y * self.s + BAR) * SS
+
+    def _disc(self, d, x, y, r, fill):
+        cx, cy = self.pp(x, y)
+        r *= self.s * SS
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=fill)
+
+    def _body(self, d, x, y, f, r, fill, nose=1.75):
+        """Teardrop: a disc of radius r with a pointed nose toward facing f."""
+        d.polygon(_teardrop(x, y, f, r, nose, self.pp), fill=fill)
+
+    def _agent(self, d, k, m, row, respawn_in, tick):
+        S = self.s * SS
         x, y, f, hp, ink, sub, alive, inv = row
         team = k // m
         col = TEAM[team]["agent"]
-        cx, cy = self.px(x, y)
+        cx, cy = self.pp(x, y)
         if not alive:
-            r = 0.35 * s
-            d.line([cx - r, cy - r, cx + r, cy + r], fill=col + (200,), width=3)
-            d.line([cx - r, cy + r, cx + r, cy - r], fill=col + (200,), width=3)
+            r = 0.3 * S
+            w = int(0.12 * S)
+            d.line([cx - r, cy - r, cx + r, cy + r], fill=col + (200,), width=w)
+            d.line([cx - r, cy + r, cx + r, cy - r], fill=col + (200,), width=w)
             if respawn_in > 0:
                 d.text(
-                    (cx + r + 2, cy - r - 2),
+                    (cx + r + 4, cy - r - 4),
                     f"{respawn_in / 10:.1f}s",
                     fill=(20, 20, 20, 220),
-                    font=self.font,
+                    font=self.font_ss,
                 )
             return
-        alpha = 110 if (inv or sub) else 255
-        r = 0.5 * s
-        fx, fy = cx + math.cos(f) * 0.95 * s, cy + math.sin(f) * 0.95 * s
-        d.line([cx, cy, fx, fy], fill=(20, 20, 20, alpha), width=max(3, s // 5))
+        alpha = 255
         if sub:
-            d.ellipse(
-                [cx - r, cy - r * 0.55, cx + r, cy + r * 0.55],
-                fill=col + (alpha,),
-                outline=(255, 255, 255, 230),
-                width=2,
-            )
+            SWIM_STYLES[self.swim_style](self, d, x, y, f, team, tick)
         else:
-            d.ellipse([cx - r - 1, cy - r - 1, cx + r + 1, cy + r + 1], fill=(20, 20, 20, alpha))
-            d.ellipse(
-                [cx - r + 1, cy - r + 1, cx + r - 1, cy + r - 1],
-                fill=col + (alpha,),
-                outline=(255, 255, 255, alpha),
-                width=2,
-            )
+            if inv:
+                alpha = 120
+            self._body(d, x, y, f, 0.42, col + (alpha,))
         # HP pips above, ink bar below.
+        pip_alpha = 150 if sub else alpha
         for i in range(3):
-            px_ = cx - 0.4 * s + i * 0.4 * s
-            fill = (230, 40, 40, alpha) if i < hp else (120, 120, 120, alpha // 2)
-            d.rectangle([px_, cy - 0.85 * s, px_ + 0.3 * s, cy - 0.65 * s], fill=fill)
-        w = 0.9 * s
-        d.rectangle([cx - w / 2, cy + 0.6 * s, cx + w / 2, cy + 0.75 * s], fill=(40, 40, 40, alpha))
-        d.rectangle(
-            [cx - w / 2, cy + 0.6 * s, cx - w / 2 + w * ink / 100, cy + 0.75 * s],
-            fill=col + (alpha,),
+            px_ = cx + (i - 1) * 0.3 * S - 0.1 * S
+            fill = (230, 50, 50, pip_alpha) if i < hp else (120, 120, 120, pip_alpha // 2)
+            d.rounded_rectangle(
+                [px_, cy - 0.8 * S, px_ + 0.2 * S, cy - 0.66 * S], radius=0.05 * S, fill=fill
+            )
+        w = 0.8 * S
+        y0, y1 = cy + 0.62 * S, cy + 0.72 * S
+        d.rounded_rectangle(
+            [cx - w / 2, y0, cx + w / 2, y1], radius=0.05 * S, fill=(40, 40, 40, pip_alpha // 2)
         )
+        if ink > 0:
+            d.rounded_rectangle(
+                [cx - w / 2, y0, cx - w / 2 + w * ink / 100, y1],
+                radius=0.05 * S,
+                fill=col + (pip_alpha,),
+            )
         label = f"{TEAM[team]['name']}{k % m}"
-        d.text((cx + r + 1, cy - r - 1), label, fill=(15, 15, 15, alpha), font=self.font)
+        d.text(
+            (cx + 0.55 * S, cy - 0.6 * S), label, fill=(15, 15, 15, pip_alpha), font=self.font_ss
+        )
 
     def _bar(self, d, score, tick):
         a, b = int(score[0]), int(score[1])
@@ -228,8 +314,10 @@ def _projectiles(replay, i: int) -> list[tuple]:
     return [(*replay.proj[i, j], owners[j]) for j in range(len(owners)) if owners[j] >= 0]
 
 
-def render_state(replay, tick: int, vision: bool = True, scale: int = 32) -> Image.Image:
-    fr = _Frame(replay, scale)
+def render_state(
+    replay, tick: int, vision: bool = True, scale: int = 32, swim_style: str = "ripple"
+) -> Image.Image:
+    fr = _Frame(replay, scale, swim_style)
     cells = cell_colors(replay.map, replay.ink_at(tick))
     return fr.draw(
         cells,
@@ -276,10 +364,11 @@ def render_video(
     t1: int | None = None,
     scale: int = 32,
     vision: bool = True,
+    swim_style: str = "ripple",
 ) -> Path:
     """Render ticks t0..t1 to MP4. ``speed`` 2.0 plays twice as fast as real time (10 ticks/s)."""
     t1 = replay.ticks if t1 is None else min(t1, replay.ticks)
-    fr = _Frame(replay, scale)
+    fr = _Frame(replay, scale, swim_style)
     per_tick = max(1, round(fps / (10 * speed)))
     cmd = [
         ffmpeg_exe(),

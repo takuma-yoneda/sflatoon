@@ -24,6 +24,7 @@ import json
 import sys
 
 from inkarena.replay import Replay, load
+from inkarena.replay.render import SWIM_STYLES
 
 __all__ = ["Replay", "load"]
 
@@ -52,6 +53,8 @@ def main() -> int:
             sp.add_argument("--t1", type=int)
         if name in ("render", "heatmap", "video"):
             sp.add_argument("--scale", type=int, default=32)
+        if name in ("render", "video"):
+            sp.add_argument("--swim-style", default="ripple", choices=sorted(SWIM_STYLES))
             sp.add_argument("-o", "--out", required=True)
     args = p.parse_args()
 
@@ -67,13 +70,27 @@ def main() -> int:
         for e in r.events(args.type, args.agent, args.t0, args.t1):
             print(json.dumps(e))
     elif args.cmd == "render":
-        print(r.render(args.tick, args.out, vision=not args.no_vision, scale=args.scale))
+        print(
+            r.render(
+                args.tick,
+                args.out,
+                vision=not args.no_vision,
+                scale=args.scale,
+                swim_style=args.swim_style,
+            )
+        )
     elif args.cmd == "heatmap":
         print(r.heatmap(args.kind, args.out, team=args.team, scale=args.scale))
     elif args.cmd == "video":
         print(
             r.video(
-                args.out, fps=args.fps, speed=args.speed, t0=args.t0, t1=args.t1, scale=args.scale
+                args.out,
+                fps=args.fps,
+                speed=args.speed,
+                t0=args.t0,
+                t1=args.t1,
+                scale=args.scale,
+                swim_style=args.swim_style,
             )
         )
     return 0

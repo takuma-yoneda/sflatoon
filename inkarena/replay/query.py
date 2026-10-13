@@ -144,10 +144,10 @@ class Replay:
 
     # -------------------------------------------------------------- rendering
 
-    def render(self, tick: int, out_png, vision: bool = True, scale: int = 32) -> Path:
+    def render(self, tick: int, out_png, vision: bool = True, scale: int = 32, **kwargs) -> Path:
         from .render import render_state
 
-        img = render_state(self, self._check(tick), vision=vision, scale=scale)
+        img = render_state(self, self._check(tick), vision=vision, scale=scale, **kwargs)
         img.save(out_png)
         return Path(out_png)
 
