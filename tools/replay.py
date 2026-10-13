@@ -54,7 +54,7 @@ def main() -> int:
         if name in ("render", "heatmap", "video"):
             sp.add_argument("--scale", type=int, default=32)
         if name in ("render", "video"):
-            sp.add_argument("--swim-style", default="ripple", choices=sorted(SWIM_STYLES))
+            sp.add_argument("--swim-style", default="eyes", choices=sorted(SWIM_STYLES))
             sp.add_argument("-o", "--out", required=True)
     args = p.parse_args()
 

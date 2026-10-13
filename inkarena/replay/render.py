@@ -153,7 +153,7 @@ def _cone(m, x: float, y: float, facing: float) -> list[tuple[float, float]]:
 class _Frame:
     """Draws one frame from interpolated agent rows and projectiles."""
 
-    def __init__(self, replay, scale: int, swim_style: str = "ripple"):
+    def __init__(self, replay, scale: int, swim_style: str = "eyes"):
         self.r = replay
         self.m = replay.map
         self.s = scale
@@ -315,7 +315,7 @@ def _projectiles(replay, i: int) -> list[tuple]:
 
 
 def render_state(
-    replay, tick: int, vision: bool = True, scale: int = 32, swim_style: str = "ripple"
+    replay, tick: int, vision: bool = True, scale: int = 32, swim_style: str = "eyes"
 ) -> Image.Image:
     fr = _Frame(replay, scale, swim_style)
     cells = cell_colors(replay.map, replay.ink_at(tick))
@@ -364,7 +364,7 @@ def render_video(
     t1: int | None = None,
     scale: int = 32,
     vision: bool = True,
-    swim_style: str = "ripple",
+    swim_style: str = "eyes",
 ) -> Path:
     """Render ticks t0..t1 to MP4. ``speed`` 2.0 plays twice as fast as real time (10 ticks/s)."""
     t1 = replay.ticks if t1 is None else min(t1, replay.ticks)
