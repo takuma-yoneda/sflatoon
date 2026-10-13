@@ -1,5 +1,19 @@
-"""Replays. Phase 1 stores seed + map + applied actions; the full .npz format comes in phase 4."""
+"""Replays: recording (recorder.py), queries (query.py) and rendering (render.py).
+
+``actions.py`` keeps the minimal seed + map + applied-actions format used to
+re-simulate a match exactly.
+"""
 
 from .actions import ActionReplay, load_replay, replay_states, save_replay
+from .query import Replay, load
+from .recorder import Recorder
 
-__all__ = ["ActionReplay", "load_replay", "replay_states", "save_replay"]
+__all__ = [
+    "ActionReplay",
+    "Recorder",
+    "Replay",
+    "load",
+    "load_replay",
+    "replay_states",
+    "save_replay",
+]

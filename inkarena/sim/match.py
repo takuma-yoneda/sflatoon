@@ -48,6 +48,7 @@ class MatchResult:
     ticks: int  # ticks played (less than rules.ticks after a forfeit)
     forfeit: int | None = None  # team that forfeited, if any
     crashes: tuple[int, int] = (0, 0)
+    recorder: object | None = None  # inkarena.replay.recorder.Recorder when record=True
 
 
 def as_player(p):
@@ -55,9 +56,19 @@ def as_player(p):
 
 
 def run_match(
-    game_map: Map, player_a, player_b, seed: int = 0, rules: Rules = DEFAULT_RULES
+    game_map: Map,
+    player_a,
+    player_b,
+    seed: int = 0,
+    rules: Rules = DEFAULT_RULES,
+    record: bool = False,
 ) -> MatchResult:
     game = Game(game_map, seed=seed, rules=rules)
+    recorder = None
+    if record:
+        from ..replay.recorder import Recorder
+
+        recorder = Recorder(game)
     players = (as_player(player_a), as_player(player_b))
     actions = np.zeros((rules.ticks, 6, ACTION_DIM))
     forfeit, ended_early = None, False
@@ -70,7 +81,11 @@ def run_match(
             break
         applied = game.read_actions(*acts)
         actions[game.state.tick] = applied
-        game.step_applied(applied)
+        if recorder is None:
+            game.step_applied(applied)
+        else:
+            prev = recorder.pre_step()
+            recorder.record(applied, game.step_applied(applied), prev)
     s = game.state
     if ended_early:
         winner = None if forfeit is None else 1 - forfeit
@@ -88,4 +103,5 @@ def run_match(
         ticks=s.tick,
         forfeit=forfeit,
         crashes=(players[0].crashes, players[1].crashes),
+        recorder=recorder,
     )

@@ -9,10 +9,11 @@ description = "Ink Arena: a top-down 2D Splatoon-like territory shooter where LL
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
-dependencies = ["numpy>=1.26"]
+dependencies = ["numpy>=1.26", "pillow>=10.1"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
+video = ["imageio-ffmpeg>=0.5"]
 
 [tool.setuptools.packages.find]
 include = ["inkarena*"]
