@@ -24,14 +24,12 @@ import numpy as np
 from ..sim.maps import load_map
 from .recorder import AGENT_COLS
 
-AGENT_NAMES = ("A0", "A1", "A2", "B0", "B1", "B2")
 _CHECKPOINT = 100
 
 
-def agent_index(agent) -> int:
-    if isinstance(agent, int | np.integer):
-        return int(agent)
-    return AGENT_NAMES.index(agent)
+def agent_names(n: int) -> tuple[str, ...]:
+    m = n // 2
+    return tuple(f"{'AB'[k // m]}{k % m}" for k in range(n))
 
 
 class Replay:
@@ -51,8 +49,16 @@ class Replay:
         self.score = data["score"]
         self._events = events or []
         self.map = load_map(self.map_name, validate=False)
+        self.n_agents = self.agents.shape[1]
+        self.team_size = self.n_agents // 2
+        self.names = agent_names(self.n_agents)
         self._diff_start = np.searchsorted(self.ink_diff[:, 0], np.arange(self.ticks + 2))
         self._ink_cache: dict[int, np.ndarray] = {0: self.ink0}
+
+    def agent_index(self, agent) -> int:
+        if isinstance(agent, int | np.integer):
+            return int(agent)
+        return self.names.index(agent)
 
     @property
     def n_states(self) -> int:
@@ -67,7 +73,7 @@ class Replay:
 
     def events(self, type: str | None = None, agent=None, t0: int = 0, t1: int | None = None):
         """Events filtered by type, by agent (any field naming it) and tick range [t0, t1]."""
-        name = None if agent is None else AGENT_NAMES[agent_index(agent)]
+        name = None if agent is None else self.names[self.agent_index(agent)]
         out = []
         for e in self._events:
             if type is not None and e["type"] != type:
@@ -99,14 +105,14 @@ class Replay:
         """Full state after ``tick`` ticks."""
         tick = self._check(tick)
         agents = []
-        for k in range(6):
+        for k in range(self.n_agents):
             row = self.agents[tick, k]
             a = {c: float(v) for c, v in zip(AGENT_COLS, row, strict=True)}
             for c in ("hp",):
                 a[c] = int(a[c])
             for c in ("submerged", "alive", "invisible"):
                 a[c] = bool(a[c])
-            a["name"] = AGENT_NAMES[k]
+            a["name"] = self.names[k]
             a["respawn_in"] = int(self.respawn_in[tick, k])
             agents.append(a)
         owners = self.proj_owner[tick]
@@ -114,7 +120,7 @@ class Replay:
             {
                 "pos": (float(p[0]), float(p[1])),
                 "dir": (float(p[2]), float(p[3])),
-                "owner": AGENT_NAMES[o],
+                "owner": self.names[o],
             }
             for p, o in zip(self.proj[tick], owners, strict=True)
             if o >= 0
@@ -131,21 +137,21 @@ class Replay:
     def trace(self, agent, t0: int = 0, t1: int | None = None) -> np.ndarray:
         """Rows of AGENT_COLS for one agent over states t0..t1 (inclusive)."""
         t1 = self.ticks if t1 is None else t1
-        return self.agents[self._check(t0) : self._check(t1) + 1, agent_index(agent)]
+        return self.agents[self._check(t0) : self._check(t1) + 1, self.agent_index(agent)]
 
     def coverage(self) -> np.ndarray:
         return self.score.copy()
 
     # -------------------------------------------------------------- rendering
 
-    def render(self, tick: int, out_png, vision: bool = True, scale: int = 16) -> Path:
+    def render(self, tick: int, out_png, vision: bool = True, scale: int = 32) -> Path:
         from .render import render_state
 
         img = render_state(self, self._check(tick), vision=vision, scale=scale)
         img.save(out_png)
         return Path(out_png)
 
-    def heatmap(self, kind: str, out_png, team: str | None = None, scale: int = 16) -> Path:
+    def heatmap(self, kind: str, out_png, team: str | None = None, scale: int = 32) -> Path:
         """``kind``: "position" (time spent per cell), "deaths", or "paint" (ink changes)."""
         from .render import render_heatmap
 

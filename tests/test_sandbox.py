@@ -10,7 +10,7 @@ BOTS = Path(__file__).parent / "bots"
 
 @pytest.fixture(scope="module")
 def obs():
-    return Game(load_map("crossroads")).observe(0)
+    return Game(load_map("duel")).observe(0)
 
 
 def tick_obs(obs, t):
@@ -20,7 +20,7 @@ def tick_obs(obs, t):
 def test_house_bot_runs_in_sandbox(obs):
     with SandboxedPlayer("baseline") as p:
         acts = p.act(obs)
-    assert len(acts) == 3 and p.crashes == 0
+    assert len(acts) == 2 and p.crashes == 0
 
 
 def test_bot_dir_with_own_modules_and_prints(obs):
@@ -82,7 +82,7 @@ def test_network_is_blocked(obs):
 
 
 def test_three_crashes_forfeit_the_match():
-    m = load_map("crossroads")
+    m = load_map("duel")
     with SandboxedPlayer(str(BOTS / "crash_bot.py")) as a, SandboxedPlayer("noop") as b:
         r = run_match(m, a, b)
     assert r.forfeit == 0 and r.winner == 1 and r.ticks == 2

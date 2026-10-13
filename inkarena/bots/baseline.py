@@ -20,10 +20,10 @@ RETARGET_EVERY = 8
 
 class Policy:
     def __init__(self, seed: int = 0):
-        self.refilling = [False] * 3
-        self.waypoints: list[list[tuple[float, float]]] = [[], [], []]
-        self.target: list[tuple[int, int] | None] = [None] * 3
-        self.age = [0] * 3
+        self.refilling: list[bool] = []
+        self.waypoints: list[list[tuple[float, float]]] = []
+        self.target: list[tuple[int, int] | None] = []
+        self.age: list[int] = []
         self.paintable = None
 
     def act(self, obs):
@@ -32,6 +32,9 @@ class Policy:
             # Only bases are painted at the start; the enemy base is our base rotated.
             own_base = ink == 1
             self.paintable = ~walls & ~own_base & ~own_base[::-1, ::-1]
+            n = len(obs["team"])
+            self.refilling, self.target, self.age = [False] * n, [None] * n, [0] * n
+            self.waypoints = [[] for _ in range(n)]
         out = []
         for i, me in enumerate(obs["team"]):
             if not me["alive"]:

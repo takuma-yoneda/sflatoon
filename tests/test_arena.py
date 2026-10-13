@@ -6,9 +6,9 @@ from inkarena.sim import list_maps
 
 
 def test_jobs_swap_sides_and_cycle_maps():
-    jobs = make_jobs("baseline", "random", 6, ["crossroads", "zigzag"])
+    jobs = make_jobs("baseline", "random", 6, ["duel", "zigzag"])
     assert [j.swapped for j in jobs] == [False, True] * 3
-    assert [j.map_name for j in jobs] == ["crossroads"] * 2 + ["zigzag"] * 2 + ["crossroads"] * 2
+    assert [j.map_name for j in jobs] == ["duel"] * 2 + ["zigzag"] * 2 + ["duel"] * 2
     assert jobs[0].seed == jobs[1].seed != jobs[2].seed
 
 

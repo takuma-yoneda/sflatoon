@@ -1,6 +1,6 @@
 """Play one match and print the board as ASCII.
 
-    python tools/demo.py [--map crossroads] [--seed 0] [--every 600]
+    python tools/demo.py [--map duel] [--seed 0] [--every 200]
 
 Legend: '#' wall, 'A'/'B' agents, 'o'/'x' team A/B ink, 'a'/'b' bases, '.' unpainted.
 Team A uses the random bot; team B stands still, so A should out-paint B.
@@ -27,18 +27,18 @@ def board(game: Game) -> str:
             else:
                 row.append({1: "o", -1: "x", 0: "."}[int(s.grid[y, x])])
         rows.append(row)
-    for k in range(6):
+    for k in range(game.n):
         if s.alive[k]:
             x, y = (int(v) for v in s.pos[k])
-            rows[y][x] = "A" if k < 3 else "B"
+            rows[y][x] = "A" if k < game.m else "B"
     return "\n".join("".join(r) for r in rows)
 
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    p.add_argument("--map", default="crossroads")
+    p.add_argument("--map", default="duel")
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--every", type=int, default=600, help="print the board every N ticks")
+    p.add_argument("--every", type=int, default=200, help="print the board every N ticks")
     args = p.parse_args()
 
     game = Game(load_map(args.map), seed=args.seed)

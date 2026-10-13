@@ -52,10 +52,6 @@ class TickEvents:
     shots: list[int] = field(default_factory=list)
 
 
-def team_of(agent: int) -> int:
-    return 0 if agent < 3 else 1
-
-
 def team_sign(team: int) -> int:
     return 1 if team == 0 else -1
 
@@ -65,6 +61,13 @@ class Game:
         self.map = game_map
         self.rules = rules
         self.seed = seed
+        self.m = rules.team_size  # agents per team
+        self.n = 2 * rules.team_size  # agents 0..m-1 are team A, m..n-1 team B
+        if len(game_map.spawns[0]) < self.m:
+            raise ValueError(
+                f"map {game_map.name} has {len(game_map.spawns[0])} spawns per team, "
+                f"rules need {self.m}"
+            )
         # v1 rules use no randomness; the RNG exists so future rules stay replayable.
         self.rng = np.random.default_rng(seed)
         self.walls = game_map.walls
@@ -75,6 +78,9 @@ class Game:
         for w in self._team_walls:
             w.flags.writeable = False
         self._score_and_visibility()
+
+    def team_of(self, agent: int) -> int:
+        return 0 if agent < self.m else 1
 
     @property
     def done(self) -> bool:
@@ -87,7 +93,7 @@ class Game:
         return self.step_applied(self.read_actions(actions_a, actions_b))
 
     def step_applied(self, applied: np.ndarray) -> TickEvents:
-        """Simulate one tick from absolute-frame applied actions, shape [6, 5]."""
+        """Simulate one tick from absolute-frame applied actions, shape [n_agents, 5]."""
         if self.done:
             raise RuntimeError("match is over")
         self.last_applied = applied
@@ -122,11 +128,11 @@ class Game:
         Dead agents' actions are ignored.
         """
         s = self.state
-        applied = np.zeros((6, ACTION_DIM))
+        applied = np.zeros((self.n, ACTION_DIM))
         for team, acts in ((0, actions_a), (1, actions_b)):
-            valid_list = isinstance(acts, list | tuple) and len(acts) == 3
-            for i in range(3):
-                k = 3 * team + i
+            valid_list = isinstance(acts, list | tuple) and len(acts) == self.m
+            for i in range(self.m):
+                k = self.m * team + i
                 parsed = _parse_action(acts[i]) if valid_list else None
                 if parsed is None or not s.alive[k]:
                     applied[k] = (0.0, 0.0, s.facing[k], 0.0, float(s.submerged[k]))
@@ -143,7 +149,7 @@ class Game:
 
     def _turn(self, applied: np.ndarray) -> None:
         s, cap = self.state, self.rules.turn_rate
-        for k in range(6):
+        for k in range(self.n):
             if not s.alive[k]:
                 continue
             d = angle_diff(applied[k, AIM], s.facing[k])
@@ -154,10 +160,10 @@ class Game:
 
     def _move(self, applied: np.ndarray) -> None:
         s, r = self.state, self.rules
-        for k in range(6):
+        for k in range(self.n):
             if not s.alive[k]:
                 continue
-            sign = team_sign(team_of(k))
+            sign = team_sign(self.team_of(k))
             x, y = s.pos[k]
             under = self.state.grid[int(y), int(x)]
             # Fire wins over swim; swim is ignored off own ink.
@@ -203,7 +209,7 @@ class Game:
     def _fire(self, applied: np.ndarray, ev: TickEvents) -> list[Projectile]:
         s, r = self.state, self.rules
         out = []
-        for k in range(6):
+        for k in range(self.n):
             if not (s.alive[k] and applied[k, FIRE]):
                 continue
             if s.submerged[k] or s.tick < s.next_fire[k] or s.ink[k] < r.shot_cost:
@@ -227,7 +233,7 @@ class Game:
         hits = []
         keep = []
         for p in s.projectiles:
-            team = team_of(p.owner)
+            team = self.team_of(p.owner)
             length = min(r.shot_speed, p.remaining)
             x0, y0 = p.x, p.y
             x1, y1 = x0 + p.dx * length, y0 + p.dy * length
@@ -236,7 +242,7 @@ class Game:
             if tw is not None:
                 t_end, landed = max(0.0, tw - _WALL_EPS / max(length, _WALL_EPS)), True
             victim = None
-            for k in range(3 * (1 - team), 3 * (1 - team) + 3):
+            for k in range(self.m * (1 - team), self.m * (1 - team) + self.m):
                 if not s.alive[k]:
                     continue
                 t = segment_circle_t(x0, y0, x1, y1, s.pos[k, 0], s.pos[k, 1], r.radius)
@@ -277,7 +283,7 @@ class Game:
             s.respawn_in[victim] = r.respawn_delay
             s.invisible[victim] = 0
             s.deaths[victim] += 1
-            self._paint_disc(paint[1 - team_of(victim)], x, y, r.burst_radius)
+            self._paint_disc(paint[1 - self.team_of(victim)], x, y, r.burst_radius)
 
     def _paint_disc(self, mask: np.ndarray, x: float, y: float, radius: float) -> None:
         """Mark cells within ``radius`` that the centre can see (splats don't cross walls)."""
@@ -299,10 +305,10 @@ class Game:
 
     def _check_submerge(self) -> None:
         s = self.state
-        for k in range(6):
+        for k in range(self.n):
             if s.submerged[k]:
                 x, y = s.pos[k]
-                if s.grid[int(y), int(x)] != team_sign(team_of(k)):
+                if s.grid[int(y), int(x)] != team_sign(self.team_of(k)):
                     s.submerged[k] = False
 
     # ----------------------------------------------------- 9. refill and regen
@@ -310,7 +316,7 @@ class Game:
     def _refill_and_regen(self) -> None:
         s, r = self.state, self.rules
         t = s.tick
-        for k in range(6):
+        for k in range(self.n):
             if not s.alive[k]:
                 continue
             if s.submerged[k]:
@@ -328,7 +334,7 @@ class Game:
         s, r = self.state, self.rules
         killed_now = {victim for _, victim, *_ in ev.kills}
         cx, cy = self.map.center
-        for k in range(6):
+        for k in range(self.n):
             if s.alive[k]:
                 if s.invisible[k] > 0:
                     s.invisible[k] -= 1
@@ -338,7 +344,7 @@ class Game:
             s.respawn_in[k] -= 1
             if s.respawn_in[k] > 0:
                 continue
-            x, y = self.map.spawns[team_of(k), k % 3]
+            x, y = self.map.spawns[self.team_of(k), k % self.m]
             s.pos[k] = (x, y)
             s.facing[k] = wrap_angle(math.atan2(cy - y, cx - x))
             s.hp[k] = r.max_hp
@@ -358,8 +364,8 @@ class Game:
         g = s.grid[self.scorable]
         s.score = (int((g == 1).sum()), int((g == -1).sum()))
         for team in (0, 1):
-            for j in range(3):
-                s.visible[team, j] = self.sees(team, 3 * (1 - team) + j)
+            for j in range(self.m):
+                s.visible[team, j] = self.sees(team, self.m * (1 - team) + j)
 
     def sees(self, team: int, target: int) -> bool:
         """Whether ``team`` can see agent ``target`` (an enemy) right now."""
@@ -369,7 +375,8 @@ class Game:
         tx, ty = s.pos[target]
         limit = self.rules.submerged_view_range if s.submerged[target] else self.rules.view_range
         return any(
-            s.alive[k] and self._in_view(k, tx, ty, limit) for k in range(3 * team, 3 * team + 3)
+            s.alive[k] and self._in_view(k, tx, ty, limit)
+            for k in range(self.m * team, self.m * team + self.m)
         )
 
     def _in_view(self, k: int, tx: float, ty: float, limit: float) -> bool:
@@ -391,7 +398,7 @@ class Game:
         s = self.state
         return any(
             s.alive[k] and self._in_view(k, x, y, self.rules.view_range)
-            for k in range(3 * team, 3 * team + 3)
+            for k in range(self.m * team, self.m * team + self.m)
         )
 
     # ------------------------------------------------------------ observation
@@ -401,7 +408,7 @@ class Game:
         s = self.state
         w, h = self.map.width, self.map.height
         team_info = []
-        for k in range(3 * team, 3 * team + 3):
+        for k in range(self.m * team, self.m * team + self.m):
             team_info.append(
                 {
                     "pos": frame.pos_to_team(s.pos[k, 0], s.pos[k, 1], team, w, h),
@@ -414,9 +421,9 @@ class Game:
                 }
             )
         enemies = []
-        for j in range(3):
+        for j in range(self.m):
             if s.visible[team, j]:
-                k = 3 * (1 - team) + j
+                k = self.m * (1 - team) + j
                 enemies.append(
                     {
                         "pos": frame.pos_to_team(s.pos[k, 0], s.pos[k, 1], team, w, h),
@@ -428,7 +435,7 @@ class Game:
         speed = self.rules.shot_speed
         projectiles = []
         for p in s.projectiles:
-            ours = team_of(p.owner) == team
+            ours = self.team_of(p.owner) == team
             if ours or self.point_visible(team, p.x, p.y):
                 projectiles.append(
                     {

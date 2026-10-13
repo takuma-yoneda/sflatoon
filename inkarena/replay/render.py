@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from ..sim.geometry import first_wall_t
 
-BAR = 44  # height of the top bar in pixels
+BAR = 64  # height of the top bar in pixels
 
 FLOOR = (238, 234, 226)
 WALL = (48, 52, 62)
@@ -85,8 +85,8 @@ class _Frame:
         self.s = scale
         self.w = self.m.width * scale
         self.h = self.m.height * scale + BAR
-        self.font = _font(max(11, scale - 2))
-        self.big = _font(max(16, int(scale * 1.25)))
+        self.font = _font(max(11, int(scale * 0.45)))
+        self.big = _font(20)
 
     def px(self, x, y):
         return x * self.s, y * self.s + BAR
@@ -111,10 +111,10 @@ class _Frame:
         if vision:
             overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
             od = ImageDraw.Draw(overlay)
-            for k in range(6):
+            for k in range(len(agents)):
                 x, y, f, *_, alive, _inv = agents[k]
                 if alive:
-                    team = k // 3
+                    team = k // (len(agents) // 2)
                     poly = [self.px(px_, py_) for px_, py_ in _cone(self.m, x, y, f)]
                     od.polygon(poly, fill=TEAM[team]["agent"] + (38,))
                     od.line(poly + [poly[0]], fill=TEAM[team]["agent"] + (90,), width=1)
@@ -123,7 +123,7 @@ class _Frame:
         overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
         d = ImageDraw.Draw(overlay)
         for x, y, dx, dy, owner in projectiles:
-            col = TEAM[int(owner) // 3]["agent"]
+            col = TEAM[int(owner) // (len(agents) // 2)]["agent"]
             tx, ty = x - dx * 0.8, y - dy * 0.8
             d.line([self.px(tx, ty), self.px(x, y)], fill=col + (140,), width=max(2, s // 5))
             r = 0.22 * s
@@ -132,16 +132,16 @@ class _Frame:
                 [cx - r, cy - r, cx + r, cy + r], fill=col + (255,), outline=(20, 20, 20, 255)
             )
 
-        for k in range(6):
-            self._agent(d, k, agents[k], int(respawn_in[k]))
+        for k in range(len(agents)):
+            self._agent(d, k, len(agents) // 2, agents[k], int(respawn_in[k]))
         img = Image.alpha_composite(img, overlay)
         self._bar(ImageDraw.Draw(img), score, tick)
         return img.convert("RGB")
 
-    def _agent(self, d, k, row, respawn_in):
+    def _agent(self, d, k, m, row, respawn_in):
         s = self.s
         x, y, f, hp, ink, sub, alive, inv = row
-        team = k // 3
+        team = k // m
         col = TEAM[team]["agent"]
         cx, cy = self.px(x, y)
         if not alive:
@@ -186,13 +186,13 @@ class _Frame:
             [cx - w / 2, cy + 0.6 * s, cx - w / 2 + w * ink / 100, cy + 0.75 * s],
             fill=col + (alpha,),
         )
-        label = f"{TEAM[team]['name']}{k % 3}"
+        label = f"{TEAM[team]['name']}{k % m}"
         d.text((cx + r + 1, cy - r - 1), label, fill=(15, 15, 15, alpha), font=self.font)
 
     def _bar(self, d, score, tick):
         a, b = int(score[0]), int(score[1])
         total = int(self.m.scorable.sum())
-        x0, x1, y0, y1 = 200, self.w - 200, 12, BAR - 12
+        x0, x1, y0, y1 = int(self.w * 0.22), int(self.w * 0.78), 36, BAR - 10
         span = x1 - x0
         d.rectangle([x0, y0, x1, y1], fill=FLOOR)
         wa, wb = span * a / total, span * b / total
@@ -200,14 +200,14 @@ class _Frame:
         d.rectangle([x1 - wb, y0, x1, y1], fill=TEAM[1]["agent"])
         d.line([(x0 + span / 2, y0 - 4), (x0 + span / 2, y1 + 4)], fill=(255, 255, 255), width=2)
         d.text(
-            (16, BAR / 2),
+            (16, (y0 + y1) / 2),
             f"A {a}  {100 * a / total:.0f}%",
             fill=TEAM[0]["ink"],
             font=self.big,
             anchor="lm",
         )
         d.text(
-            (self.w - 16, BAR / 2),
+            (self.w - 16, (y0 + y1) / 2),
             f"{100 * b / total:.0f}%  {b} B",
             fill=TEAM[1]["ink"],
             font=self.big,
@@ -215,9 +215,9 @@ class _Frame:
         )
         secs = tick / 10
         d.text(
-            (self.w / 2, BAR / 2),
+            (self.w / 2, 18),
             f"{int(secs // 60)}:{secs % 60:04.1f}",
-            fill=(20, 20, 20),
+            fill=(235, 235, 235),
             font=self.big,
             anchor="mm",
         )
@@ -228,7 +228,7 @@ def _projectiles(replay, i: int) -> list[tuple]:
     return [(*replay.proj[i, j], owners[j]) for j in range(len(owners)) if owners[j] >= 0]
 
 
-def render_state(replay, tick: int, vision: bool = True, scale: int = 16) -> Image.Image:
+def render_state(replay, tick: int, vision: bool = True, scale: int = 32) -> Image.Image:
     fr = _Frame(replay, scale)
     cells = cell_colors(replay.map, replay.ink_at(tick))
     return fr.draw(
@@ -244,7 +244,7 @@ def render_state(replay, tick: int, vision: bool = True, scale: int = 16) -> Ima
 
 def _lerp_agents(a0: np.ndarray, a1: np.ndarray, t: float) -> np.ndarray:
     out = a1.copy()
-    for k in range(6):
+    for k in range(len(a1)):
         if a0[k, 6] and a1[k, 6] and math.dist(a0[k, :2], a1[k, :2]) < 2.0:
             out[k, :2] = a0[k, :2] + (a1[k, :2] - a0[k, :2]) * t
             df = (a1[k, 2] - a0[k, 2] + math.pi) % (2 * math.pi) - math.pi
@@ -274,7 +274,7 @@ def render_video(
     speed: float = 1.0,
     t0: int = 0,
     t1: int | None = None,
-    scale: int = 16,
+    scale: int = 32,
     vision: bool = True,
 ) -> Path:
     """Render ticks t0..t1 to MP4. ``speed`` 2.0 plays twice as fast as real time (10 ticks/s)."""
@@ -341,10 +341,13 @@ def render_video(
     return Path(out_mp4)
 
 
-def render_heatmap(replay, kind: str, team: str | None = None, scale: int = 16) -> Image.Image:
+def render_heatmap(replay, kind: str, team: str | None = None, scale: int = 32) -> Image.Image:
     m = replay.map
     counts = np.zeros(m.walls.shape, dtype=np.float64)
-    agents = range(6) if team is None else range(3) if team == "A" else range(3, 6)
+    size = replay.team_size
+    agents = (
+        range(2 * size) if team is None else range(size) if team == "A" else range(size, 2 * size)
+    )
     if kind == "position":
         for k in agents:
             alive = replay.agents[:, k, 6] > 0
@@ -352,7 +355,7 @@ def render_heatmap(replay, kind: str, team: str | None = None, scale: int = 16) 
             ys = replay.agents[alive, k, 1].astype(int)
             np.add.at(counts, (ys, xs), 1)
     elif kind == "deaths":
-        names = {f"{'AB'[k // 3]}{k % 3}" for k in agents}
+        names = {replay.names[k] for k in agents}
         for e in replay.events("splat"):
             if e["victim"] in names:
                 counts[int(e["pos"][1]), int(e["pos"][0])] += 1

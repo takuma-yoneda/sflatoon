@@ -43,7 +43,7 @@ class MatchResult:
     winner: int | None  # 0 = team A, 1 = team B, None = draw
     kills: tuple[int, ...]
     deaths: tuple[int, ...]
-    actions: np.ndarray  # float[T, 6, 5] applied actions, absolute frame
+    actions: np.ndarray  # float[T, n, 5] applied actions, absolute frame
     final_digest: str
     ticks: int  # ticks played (less than rules.ticks after a forfeit)
     forfeit: int | None = None  # team that forfeited, if any
@@ -70,7 +70,7 @@ def run_match(
 
         recorder = Recorder(game)
     players = (as_player(player_a), as_player(player_b))
-    actions = np.zeros((rules.ticks, 6, ACTION_DIM))
+    actions = np.zeros((rules.ticks, game.n, ACTION_DIM))
     forfeit, ended_early = None, False
     while not game.done:
         acts = [players[team].act(game.observe(team)) for team in (0, 1)]

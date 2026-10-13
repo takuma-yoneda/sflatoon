@@ -51,7 +51,7 @@ def main() -> int:
             sp.add_argument("--t0", type=int, default=0)
             sp.add_argument("--t1", type=int)
         if name in ("render", "heatmap", "video"):
-            sp.add_argument("--scale", type=int, default=16)
+            sp.add_argument("--scale", type=int, default=32)
             sp.add_argument("-o", "--out", required=True)
     args = p.parse_args()
 

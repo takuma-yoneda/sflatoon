@@ -27,8 +27,10 @@ def open_map_text(walls=()):
 
 
 def make_game(walls=(), **rules):
+    """Rule tests use 3v3 so agent indices 0-2 are team A and 3-5 team B."""
     from inkarena.sim import Rules
 
+    rules.setdefault("team_size", 3)
     return Game(parse_map(open_map_text(walls), name="open"), rules=Rules(**rules))
 
 

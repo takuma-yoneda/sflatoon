@@ -13,7 +13,7 @@ def digests_of(game_map, actions, seed):
 
 
 def test_same_seed_and_bots_give_identical_matches():
-    m = load_map("crossroads")
+    m = load_map("duel")
     r1 = run_match(m, random_bot.Policy(1), random_bot.Policy(2), seed=5)
     r2 = run_match(m, random_bot.Policy(1), random_bot.Policy(2), seed=5)
     assert r1.final_digest == r2.final_digest
@@ -40,10 +40,10 @@ def test_replay_reproduces_every_tick(tmp_path):
 
 
 def test_run_match_actions_replay_to_final_state():
-    m = load_map("crossroads")
+    m = load_map("duel")
     r = run_match(m, random_bot.Policy(4), noop.Policy(), seed=9)
     assert digests_of(m, r.actions, r.seed)[-1] == r.final_digest
-    assert r.actions.shape == (1800, 6, 5)
+    assert r.actions.shape == (600, 4, 5)
 
 
 def test_crashing_policy_is_a_noop_then_forfeits():
@@ -51,9 +51,9 @@ def test_crashing_policy_is_a_noop_then_forfeits():
         def act(self, obs):
             raise RuntimeError("boom")
 
-    m = load_map("crossroads")
+    m = load_map("duel")
     r = run_match(m, Crash(), random_bot.Policy(0), seed=0)
     assert r.ticks == 2  # crashes on ticks 0 and 1 are no-ops; the third forfeits
-    assert not r.actions[:, :3, [0, 1, 3]].any()  # no moves, no fire
+    assert not r.actions[:, :2, [0, 1, 3]].any()  # no moves, no fire
     assert r.forfeit == 0 and r.winner == 1
     assert r.crashes == (3, 0)

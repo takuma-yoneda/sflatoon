@@ -67,8 +67,8 @@ def test_regions():
 
 
 def test_distance_field_on_real_map():
-    m = load_map("crossroads")
-    d = h.distance_field(m.walls, [(30, 36)])
-    assert d[36, 30] == 0
+    m = load_map("duel")
+    d = h.distance_field(m.walls, [(15, 18)])
+    assert d[18, 15] == 0
     assert (d[~m.walls] < h.UNREACHABLE).all()
     assert (d[m.walls] == h.UNREACHABLE).all()

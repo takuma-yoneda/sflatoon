@@ -13,8 +13,8 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Rules:
     # Match
-    ticks: int = 1800
-    team_size: int = 3
+    ticks: int = 600  # 60 s
+    team_size: int = 2
 
     # Agents
     radius: float = 0.4

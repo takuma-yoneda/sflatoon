@@ -1,14 +1,15 @@
 """Record a match into replay arrays and neutral events (design doc sections 4 and 7).
 
-Replay ``.npz`` contents (absolute frame; agents 0-2 are team A, 3-5 team B):
+Replay ``.npz`` contents (absolute frame; with m agents per team, agents 0..m-1 are
+team A and m..2m-1 team B, n = 2m):
 
 - ``seed``, ``map_name``, ``ticks``
-- ``agents`` float32[T+1, 6, 8]: x, y, facing, hp, ink, submerged, alive, invisible
+- ``agents`` float32[T+1, n, 8]: x, y, facing, hp, ink, submerged, alive, invisible
   (row 0 is the initial state, row t+1 the state after tick t)
 - ``respawn_in`` int16[T+1, 6]
 - ``proj`` float32[T+1, P, 4]: x, y, dx, dy, padded with NaN; ``proj_owner`` int8[T+1, P], -1 pad
 - ``ink0`` int8[H, W] initial ink; ``ink_diff`` int32[N, 4]: (state index, y, x, new value)
-- ``actions`` float64[T, 6, 5]: applied actions (move x, move y, aim, fire, swim)
+- ``actions`` float64[T, n, 5]: applied actions (move x, move y, aim, fire, swim)
 - ``visible`` bool[T+1, 2, 3]: team t sees the other team's agent j
 - ``score`` int32[T+1, 2]
 
@@ -31,8 +32,9 @@ COVERAGE_EVERY = 100
 INK_EMPTY = 4.0
 
 
-def agent_name(k: int) -> str:
-    return f"{'AB'[k // 3]}{k % 3}"
+def agent_name(k: int, m: int) -> str:
+    """A0, A1, ... for team A; B0, B1, ... for team B."""
+    return f"{'AB'[k // m]}{k % m}"
 
 
 class Recorder:
@@ -52,7 +54,7 @@ class Recorder:
 
     def _snapshot(self) -> None:
         s = self.game.state
-        a = np.empty((6, len(AGENT_COLS)), dtype=np.float32)
+        a = np.empty((self.game.n, len(AGENT_COLS)), dtype=np.float32)
         a[:, 0:2] = s.pos
         a[:, 2] = s.facing
         a[:, 3] = s.hp
@@ -92,8 +94,8 @@ class Recorder:
                 {
                     "type": "splat",
                     "tick": t,
-                    "killer": agent_name(killer),
-                    "victim": agent_name(victim),
+                    "killer": agent_name(killer, g.m),
+                    "victim": agent_name(victim, g.m),
                     "pos": [round(x, 3), round(y, 3)],
                     "dist": round(dist, 3),
                     "victim_saw_killer": bool(saw),
@@ -104,23 +106,23 @@ class Recorder:
                 {
                     "type": "respawn",
                     "tick": t,
-                    "agent": agent_name(k),
+                    "agent": agent_name(k, g.m),
                     "pos": [float(s.pos[k, 0]), float(s.pos[k, 1])],
                 }
             )
-        for k in range(6):
+        for k in range(g.n):
             if s.alive[k] and s.ink[k] < INK_EMPTY <= prev_ink[k]:
-                self.events.append({"type": "ink_empty", "tick": t, "agent": agent_name(k)})
+                self.events.append({"type": "ink_empty", "tick": t, "agent": agent_name(k, g.m)})
         for team in (0, 1):
-            for j in range(3):
+            for j in range(g.m):
                 if s.visible[team, j] and not prev_visible[team, j]:
-                    k = 3 * (1 - team) + j
+                    k = g.m * (1 - team) + j
                     self.events.append(
                         {
                             "type": "enemy_spotted",
                             "tick": t,
                             "team": "AB"[team],
-                            "enemy": agent_name(k),
+                            "enemy": agent_name(k, g.m),
                             "pos": [round(float(s.pos[k, 0]), 3), round(float(s.pos[k, 1]), 3)],
                         }
                     )
@@ -144,7 +146,7 @@ class Recorder:
             proj[i, : len(p)] = p[:, :4]
             owner[i, : len(p)] = p[:, 4]
         diff = np.concatenate(self.ink_diff) if self.ink_diff else np.zeros((0, 4), np.int32)
-        actions = np.stack(self.actions) if self.actions else np.zeros((0, 6, 5))
+        actions = np.stack(self.actions) if self.actions else np.zeros((0, self.game.n, 5))
         return {
             "seed": np.int64(self.game.seed),
             "map_name": np.str_(self.game.map.name),

@@ -12,19 +12,17 @@ from inkarena.sim import load_map, run_match
 @pytest.fixture(scope="module")
 def match(tmp_path_factory):
     out = tmp_path_factory.mktemp("rep")
-    r = run_match(
-        load_map("crossroads"), baseline.Policy(), random_bot.Policy(3), seed=2, record=True
-    )
+    r = run_match(load_map("duel"), baseline.Policy(), random_bot.Policy(3), seed=2, record=True)
     r.recorder.save(out / "m000.replay.npz", out / "m000.events.jsonl")
     return r, load(out / "m000.replay.npz"), out
 
 
 def test_arrays_and_shapes(match):
     r, rep, _ = match
-    assert rep.ticks == 1800 and rep.n_states == 1801
-    assert rep.agents.shape == (1801, 6, 8)
-    assert rep.visible.shape == (1801, 2, 3)
-    assert rep.actions.shape == (1800, 6, 5)
+    assert rep.ticks == 600 and rep.n_states == 601
+    assert rep.agents.shape == (601, 4, 8)
+    assert rep.visible.shape == (601, 2, 2)
+    assert rep.actions.shape == (600, 4, 5)
     assert np.array_equal(rep.actions, r.actions)
     assert tuple(rep.score[-1]) == r.score
 
@@ -32,7 +30,7 @@ def test_arrays_and_shapes(match):
 def test_ink_reconstruction_matches_score(match):
     _, rep, _ = match
     m = rep.map
-    for t in (0, 1, 99, 100, 101, 777, 1800):
+    for t in (0, 1, 99, 100, 101, 377, 600):
         ink = rep.ink_at(t)
         assert ((ink == 1) & m.scorable).sum() == rep.score[t, 0]
         assert ((ink == -1) & m.scorable).sum() == rep.score[t, 1]
@@ -41,7 +39,7 @@ def test_ink_reconstruction_matches_score(match):
 def test_state_at_and_trace(match):
     _, rep, _ = match
     s = rep.state_at(500)
-    assert [a["name"] for a in s["agents"]] == ["A0", "A1", "A2", "B0", "B1", "B2"]
+    assert [a["name"] for a in s["agents"]] == ["A0", "A1", "B0", "B1"]
     assert s["score"] == tuple(rep.score[500])
     tr = rep.trace("A1", 10, 20)
     assert tr.shape == (11, 8)
@@ -55,7 +53,7 @@ def test_events(match):
     r, rep, out = match
     types = {e["type"] for e in rep.events()}
     assert {"splat", "respawn", "coverage_checkpoint", "enemy_spotted"} <= types
-    assert len(rep.events("coverage_checkpoint")) == 18
+    assert len(rep.events("coverage_checkpoint")) == 6
     assert sum(r.kills) == len(rep.events("splat"))
     for e in rep.events("splat", agent="B1"):
         assert "B1" in (e["killer"], e["victim"])
@@ -67,7 +65,7 @@ def test_events(match):
 def test_respawn_and_splat_events_line_up(match):
     _, rep, _ = match
     for e in rep.events("splat")[:5]:
-        victim = ["A0", "A1", "A2", "B0", "B1", "B2"].index(e["victim"])
+        victim = rep.agent_index(e["victim"])
         assert not rep.state_at(e["tick"] + 1)["agents"][victim]["alive"]
         assert rep.state_at(e["tick"])["agents"][victim]["alive"]
 
@@ -96,12 +94,12 @@ def test_render_png_and_heatmaps(match, tmp_path):
     _, rep, _ = match
     from PIL import Image
 
-    for t in (0, 900, 1800):
+    for t in (0, 300, 600):
         img = Image.open(rep.render(t, tmp_path / f"t{t}.png"))
-        assert img.size == (64 * 16, 40 * 16 + 44)
+        assert img.size == (32 * 32, 20 * 32 + 64)
     for kind in ("position", "deaths", "paint"):
         img = Image.open(rep.heatmap(kind, tmp_path / f"{kind}.png", team="A"))
-        assert img.size == (64 * 16, 40 * 16)
+        assert img.size == (32 * 32, 20 * 32)
     with pytest.raises(ValueError):
         rep.heatmap("nope", tmp_path / "x.png")
 

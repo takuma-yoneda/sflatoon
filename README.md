@@ -1,6 +1,6 @@
 # Ink Arena (sflatoon)
 
-A top-down 2D Splatoon-like 3v3 territory shooter where LLMs compete by writing bots.
+A top-down 2D Splatoon-like 2v2 territory shooter where LLMs compete by writing bots.
 Bots never run per-tick inside a model; models author a `policy.py` that the simulator runs.
 
 Status: phase 4 (replays and rendering). Phase 3 (tuning) comes next. See the design doc and build plan in the project for the roadmap.
@@ -13,7 +13,7 @@ inkarena/
   bots/       house bots (noop, random, baseline) and the bot helper library (helpers.py)
   arena/      bot loader, subprocess sandbox, match runner
   replay/     replay recorder (.npz + events.jsonl), query library, PNG/heatmap/MP4 renderer
-  maps/       bundled ASCII maps (64x40, 180-degree symmetric)
+  maps/       bundled ASCII maps (32x20, 180-degree symmetric)
 tools/
   validate_maps.py   check map symmetry and reachability
   bench.py           matches/min across worker processes
@@ -54,6 +54,9 @@ print(result.score, result.winner)
 ```
 
 ## Simulator notes
+
+- Current format: 2v2, 60 s matches (600 ticks), 32x20 maps. Team size and match length are
+  `Rules.team_size` and `Rules.ticks`; a map needs at least `team_size` spawn digits (`1`, `2`, ...).
 
 - Tick order follows design doc §4; each step is one method of `inkarena.sim.engine.Game`.
 - Arrays are indexed `[y, x]`; map files list rows top to bottom, so line `y`, column `x` is cell
