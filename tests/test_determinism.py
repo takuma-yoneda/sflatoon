@@ -46,12 +46,14 @@ def test_run_match_actions_replay_to_final_state():
     assert r.actions.shape == (1800, 6, 5)
 
 
-def test_crashing_policy_is_a_noop():
+def test_crashing_policy_is_a_noop_then_forfeits():
     class Crash:
         def act(self, obs):
             raise RuntimeError("boom")
 
     m = load_map("crossroads")
     r = run_match(m, Crash(), random_bot.Policy(0), seed=0)
+    assert r.ticks == 2  # crashes on ticks 0 and 1 are no-ops; the third forfeits
     assert not r.actions[:, :3, [0, 1, 3]].any()  # no moves, no fire
-    assert r.score[0] == 0
+    assert r.forfeit == 0 and r.winner == 1
+    assert r.crashes == (3, 0)
