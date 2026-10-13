@@ -36,16 +36,17 @@ def _dark(c, k=0.6):
     return tuple(int(v * k) for v in c)
 
 
-def _teardrop(x, y, f, r, nose, to_px, n=28):
-    """Polygon (pixels) of a disc of radius r whose front tapers to a point nose*r ahead."""
+def _pointer(x, y, f, r, to_px):
+    """Small triangle floating just ahead of a disc of radius r, pointing along f."""
     ux, uy = math.cos(f), math.sin(f)
-    tip = (x + ux * r * nose, y + uy * r * nose)
-    half = math.acos(1 / nose)  # tangent points seen from the tip
-    pts = [to_px(*tip)]
-    for i in range(n + 1):
-        a = f + half + (2 * math.pi - 2 * half) * i / n
-        pts.append(to_px(x + r * math.cos(a), y + r * math.sin(a)))
-    return pts
+    vx, vy = -uy, ux
+    gap, length, half = 0.18 * r, 0.42 * r, 0.32 * r
+    bx, by = x + ux * (r + gap), y + uy * (r + gap)
+    return [
+        to_px(bx + ux * length, by + uy * length),
+        to_px(bx + vx * half, by + vy * half),
+        to_px(bx - vx * half, by - vy * half),
+    ]
 
 
 def _swim_ripple(fr, d, x, y, f, team, tick):
@@ -60,7 +61,7 @@ def _swim_ripple(fr, d, x, y, f, team, tick):
         outline=col + (int(200 * (1 - phase)),),
         width=int(0.06 * S),
     )
-    fr._body(d, x, y, f, 0.24, _dark(col, 0.8) + (170,), nose=1.6)
+    fr._body(d, x, y, f, 0.24, _dark(col, 0.8) + (170,))
 
 
 def _swim_fin(fr, d, x, y, f, team, tick):
@@ -221,9 +222,10 @@ class _Frame:
         r *= self.s * SS
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=fill)
 
-    def _body(self, d, x, y, f, r, fill, nose=1.75):
-        """Teardrop: a disc of radius r with a pointed nose toward facing f."""
-        d.polygon(_teardrop(x, y, f, r, nose, self.pp), fill=fill)
+    def _body(self, d, x, y, f, r, fill):
+        """A disc of radius r with a small detached triangle showing facing f."""
+        self._disc(d, x, y, r, fill)
+        d.polygon(_pointer(x, y, f, r, self.pp), fill=fill)
 
     def _agent(self, d, k, m, row, respawn_in, tick):
         S = self.s * SS
@@ -250,17 +252,17 @@ class _Frame:
         else:
             if inv:
                 alpha = 120
-            self._body(d, x, y, f, 0.42, col + (alpha,))
+            self._body(d, x, y, f, 0.36, col + (alpha,))
         # HP pips above, ink bar below.
         pip_alpha = 150 if sub else alpha
         for i in range(3):
             px_ = cx + (i - 1) * 0.3 * S - 0.1 * S
             fill = (230, 50, 50, pip_alpha) if i < hp else (120, 120, 120, pip_alpha // 2)
             d.rounded_rectangle(
-                [px_, cy - 0.8 * S, px_ + 0.2 * S, cy - 0.66 * S], radius=0.05 * S, fill=fill
+                [px_, cy - 0.9 * S, px_ + 0.2 * S, cy - 0.76 * S], radius=0.05 * S, fill=fill
             )
         w = 0.8 * S
-        y0, y1 = cy + 0.62 * S, cy + 0.72 * S
+        y0, y1 = cy + 0.72 * S, cy + 0.82 * S
         d.rounded_rectangle(
             [cx - w / 2, y0, cx + w / 2, y1], radius=0.05 * S, fill=(40, 40, 40, pip_alpha // 2)
         )
