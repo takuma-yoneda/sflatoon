@@ -1,4 +1,4 @@
-"""Rule parameters for Ink Arena v1.
+"""Rule parameters for Ink Arena v1.1.
 
 Values marked (tune) in the design doc live here so the tuning pass can change
 them in one place. Distances are in cells, times in ticks (10 ticks = 1 s).
@@ -33,6 +33,10 @@ class Rules:
     swim_refill: float = 5.0
     idle_refill: float = 0.5
     idle_refill_delay: int = 5
+
+    # Randomness, drawn from the match seed (rules v1.1)
+    spawn_jitter: float = 1.0  # max spawn offset per axis, cells; team B gets the mirror image
+    shot_spread: float = math.radians(3)  # max deviation of a shot from facing, either way
 
     # Shots (tune)
     shot_speed: float = 1.5

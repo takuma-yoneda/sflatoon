@@ -53,6 +53,15 @@ def _player(spec: str, seed: int, sandbox: bool):
     return InProcessPlayer(load_policy_class(spec)(seed))
 
 
+def _timing(p) -> dict:
+    """CPU per tick and the ticks a sandboxed bot lost to its time limits."""
+    return {
+        "mean_ms": round(1000 * p.cpu_used / max(1, p.ticks), 3),
+        "slow_ticks": p.slow_ticks,
+        "timeouts": p.timeouts,
+    }
+
+
 def play(job: Job) -> dict:
     team_specs = (job.bot_b, job.bot_a) if job.swapped else (job.bot_a, job.bot_b)
     # Each side gets its own bot seed so a bot playing itself doesn't mirror its moves.
@@ -85,6 +94,8 @@ def play(job: Job) -> dict:
         "crashes": [r.crashes[side], r.crashes[1 - side]],
         "errors": [getattr(p, "errors", [])[:5] for p in (players[side], players[1 - side])],
     }
+    if job.sandbox:
+        summary["timing"] = [_timing(p) for p in (players[side], players[1 - side])]
     if job.out_dir:
         out = Path(job.out_dir)
         out.mkdir(parents=True, exist_ok=True)

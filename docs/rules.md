@@ -1,6 +1,6 @@
-# Ink Arena rules v1
+# Ink Arena rules v1.1
 
-These are the frozen v1 rules. Every number below is a field of `inkarena.sim.Rules`
+These are the frozen v1.1 rules (v1 plus seeded randomness, see below). Every number below is a field of `inkarena.sim.Rules`
 (`inkarena/sim/config.py`), and `DEFAULT_RULES` holds exactly these values. Distances are
 in cells and times in ticks; there are 10 ticks per second.
 
@@ -37,10 +37,19 @@ their own base is at the bottom (see [api.md](api.md)).
 - A shot costs 4 ink (`shot_cost`) and needs at least that much in the tank. After firing, an agent must wait 3 ticks before firing again (`fire_cooldown`).
 - Submerged agents can't fire. If an action sets both `fire` and `swim`, fire wins and the agent surfaces.
 - A submerged agent refills 5 ink per tick (`swim_refill`). An agent that isn't submerged refills 0.5 ink per tick (`idle_refill`) on any ground, starting 5 ticks after its last shot (`idle_refill_delay`).
-- A shot is a projectile that moves 1.5 cells per tick (`shot_speed`) for up to 3 cells (`shot_range`), along the shooter's facing.
+- A shot is a projectile that moves 1.5 cells per tick (`shot_speed`) for up to 3 cells (`shot_range`), along the shooter's facing give or take a random spread of up to 3° (`shot_spread`).
 - It paints every cell whose center is within 1.0 of its path, a strip 3 cells wide (`strip_halfwidth`). Where it stops, it paints a splat of radius 1.5 (`splat_radius`).
 - Walls stop shots. Splats and death bursts never reach a cell that a wall hides from their center.
 - A shot that hits an enemy deals 1 damage (`shot_damage`) and stops there.
+
+## Randomness
+
+All randomness comes from one RNG seeded with the match seed, so a seed plus the actions
+still reproduces a match exactly. Added in v1.1 so that two bots that ignore their seeds
+don't replay the same game in every match.
+
+- **Spawn jitter.** At the start of each match every spawn point moves by a random offset of up to 1 cell on each axis (`spawn_jitter`). Team B's offset is the mirror image of team A's, so the map stays fair. An offset that would put an agent in a wall is redrawn. Agents respawn at the same jittered point for the whole match.
+- **Shot spread.** Each shot leaves at the shooter's facing plus a random angle of up to 3° either way (`shot_spread`).
 
 ## Health, death and respawn
 

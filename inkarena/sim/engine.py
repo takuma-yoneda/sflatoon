@@ -68,16 +68,42 @@ class Game:
                 f"map {game_map.name} has {len(game_map.spawns[0])} spawns per team, "
                 f"rules need {self.m}"
             )
-        # v1 rules use no randomness; the RNG exists so future rules stay replayable.
+        # All randomness (spawn jitter, shot spread) comes from this one seeded RNG.
         self.rng = np.random.default_rng(seed)
         self.walls = game_map.walls
         self.base = game_map.base
         self.scorable = game_map.scorable
+        self.spawns = self._jitter_spawns()
         self.state: State = initial_state(game_map, rules)
+        s, (cx, cy) = self.state, game_map.center
+        for k in range(self.n):
+            x, y = s.pos[k] = self.spawns[self.team_of(k), k % self.m]
+            s.facing[k] = wrap_angle(math.atan2(cy - y, cx - x))
         self._team_walls = [frame.grid_to_team(self.walls, t).copy() for t in (0, 1)]
         for w in self._team_walls:
             w.flags.writeable = False
         self._score_and_visibility()
+
+    def _jitter_spawns(self) -> np.ndarray:
+        """This match's spawn points: each map spawn moved by a random offset, mirrored for B.
+
+        An offset that would put either team's agent in a wall is redrawn, up to 10 times,
+        then dropped. Agents respawn at the same jittered point all match.
+        """
+        spawns = self.map.spawns.copy()
+        j, rad = self.rules.spawn_jitter, self.rules.radius
+        if j <= 0:
+            return spawns
+        for i in range(spawns.shape[1]):
+            for _ in range(10):
+                off = self.rng.uniform(-j, j, size=2)
+                a, b = spawns[0, i] + off, spawns[1, i] - off
+                if not (
+                    circle_hits_wall(self.walls, *a, rad) or circle_hits_wall(self.walls, *b, rad)
+                ):
+                    spawns[0, i], spawns[1, i] = a, b
+                    break
+        return spawns
 
     def team_of(self, agent: int) -> int:
         return 0 if agent < self.m else 1
@@ -218,6 +244,8 @@ class Game:
             s.next_fire[k] = s.tick + r.fire_cooldown
             s.last_shot[k] = s.tick
             f = s.facing[k]
+            if r.shot_spread > 0:
+                f += self.rng.uniform(-r.shot_spread, r.shot_spread)
             out.append(
                 Projectile(s.pos[k, 0], s.pos[k, 1], math.cos(f), math.sin(f), r.shot_range, k)
             )
@@ -344,7 +372,7 @@ class Game:
             s.respawn_in[k] -= 1
             if s.respawn_in[k] > 0:
                 continue
-            x, y = self.map.spawns[self.team_of(k), k % self.m]
+            x, y = self.spawns[self.team_of(k), k % self.m]
             s.pos[k] = (x, y)
             s.facing[k] = wrap_angle(math.atan2(cy - y, cx - x))
             s.hp[k] = r.max_hp

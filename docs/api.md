@@ -85,6 +85,26 @@ of `obs`.
 | `distance_field(walls, sources)` | Walking distance in cells from the source cells |
 | `cell_of(pos)`, `center_of(cell)` | Convert between points and cells |
 
+## Match results
+
+`tools/arena.py --out DIR` writes `DIR/summary.json` plus a replay per match. Official results in
+`replays/round_N/<opponent>/` have the same layout. `tally` holds the wins, draws, losses and win
+rate for bot `a`. `matches` has one entry per match, always from bot `a`'s side:
+
+| Field | Meaning |
+|---|---|
+| `id` | Match ID, also the replay's file name (`m004` → `m004.replay.npz`) |
+| `a`, `b` | The two bots |
+| `map`, `seed` | Map and match seed |
+| `side` | `"A"` or `"B"`: which team bot `a` played. Each seed is played from both sides |
+| `result` | `"win"`, `"draw"` or `"loss"` for bot `a` |
+| `score` | Cells painted at the end: `[a, b]` |
+| `ticks` | Ticks played |
+| `forfeit` | `"a"` or `"b"` if that bot forfeited after 3 crashes, else `null` |
+| `crashes`, `errors` | Crash count and the first few crash messages: `[a, b]` |
+| `timing` | Per bot: `mean_ms` CPU per tick, `slow_ticks` (no-op ticks over the average budget) and `timeouts` (ticks over the 50 ms limit): `[a, b]` |
+| `coverage` | `[second, a cells, b cells]` every 10 s, when replays were written |
+
 ## Example
 
 This bot sends each agent to the nearest cell that isn't ours, firing where it walks.
