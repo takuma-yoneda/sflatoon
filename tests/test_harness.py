@@ -47,6 +47,16 @@ def test_budget_charges_and_refuses(tmp_path, monkeypatch):
     assert b.matches == 6 and "local matches 6/10" in b.echo()
 
 
+def test_parallel_charges_all_count(tmp_path):
+    bf = tmp_path / "budget.json"
+    Budget.start(bf, max_matches=200)
+    env = dict(os.environ, INKARENA_BUDGET=str(bf))
+    code = "from inkarena.harness.budget import charge_matches as c\nfor _ in range(25): c(1)"
+    procs = [subprocess.Popen([sys.executable, "-c", code], env=env) for _ in range(4)]
+    assert [p.wait() for p in procs] == [0, 0, 0, 0]
+    assert Budget.load(bf).matches == 100
+
+
 def test_truncate_keeps_head_and_tail():
     text = "a" * 20_000 + "END"
     out = truncate(text)

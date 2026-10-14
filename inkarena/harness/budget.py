@@ -7,6 +7,7 @@ that file.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import time
@@ -40,7 +41,7 @@ class Budget:
         return cls(**json.loads(Path(path).read_text()))
 
     def save(self, path: Path) -> None:
-        tmp = Path(path).with_suffix(".tmp")
+        tmp = Path(path).with_suffix(f".{os.getpid()}.tmp")
         tmp.write_text(json.dumps(asdict(self)))
         os.replace(tmp, path)
 
@@ -78,9 +79,12 @@ def charge_matches(n: int) -> None:
     path = os.environ.get(ENV)
     if not path:
         return  # outside the harness: no budget
-    b = Budget.load(Path(path))
-    if b.matches + n > b.max_matches:
-        left = b.max_matches - b.matches
-        raise BudgetExceeded(f"only {left} local matches left this revision, asked for {n}")
-    b.matches += n
-    b.save(Path(path))
+    # Lock so that arena runs started in parallel each get charged.
+    with open(Path(path).with_suffix(".lock"), "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        b = Budget.load(Path(path))
+        if b.matches + n > b.max_matches:
+            left = b.max_matches - b.matches
+            raise BudgetExceeded(f"only {left} local matches left this revision, asked for {n}")
+        b.matches += n
+        b.save(Path(path))
