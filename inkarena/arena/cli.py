@@ -14,6 +14,7 @@ import os
 import sys
 
 from ..sim import list_maps
+from .loader import resolve
 from .runner import make_jobs, run_jobs, tally, write_summary
 
 
@@ -29,10 +30,18 @@ def main(argv: list[str] | None = None, before_run=None) -> int:
     p.add_argument("--workers", type=int, default=os.cpu_count() or 1)
     p.add_argument("--no-sandbox", action="store_true", help="run bots in-process (trusted only)")
     args = p.parse_args(argv)
+    # Check the bots and maps before before_run, which may charge a budget for the matches.
+    for spec in (args.a, args.b):
+        try:
+            resolve(spec)
+        except FileNotFoundError as e:
+            p.error(str(e))
+    maps = list_maps() if args.maps == "all" else args.maps.split(",")
+    if unknown := sorted(set(maps) - set(list_maps())):
+        p.error(f"unknown maps {unknown}; choose from {list_maps()}")
     if before_run is not None:
         before_run(args)
 
-    maps = list_maps() if args.maps == "all" else args.maps.split(",")
     jobs = make_jobs(args.a, args.b, args.n, maps, not args.no_sandbox, args.out, args.seed)
     results = run_jobs(jobs, args.workers)
     for r in results:

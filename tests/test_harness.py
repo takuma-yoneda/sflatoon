@@ -71,6 +71,18 @@ def test_view_image_stays_in_workspace(tmp_path):
     assert load_image(tmp_path, "missing.png")[0] is None
 
 
+def test_workspace_arena_charges_nothing_for_a_bad_bot(tmp_path):
+    ws = create_workspace(tmp_path / "ws")
+    budget = tmp_path / "b.json"
+    Budget.start(budget, max_matches=50)
+    env = {**os.environ, "INKARENA_BUDGET": str(budget)}
+    for bad in (["--a", "missing/"], ["--a", "bot/", "--maps", "nowhere"]):
+        cmd = [sys.executable, "tools/arena.py", "--b", "noop", "-n", "20", *bad]
+        p = subprocess.run(cmd, cwd=ws, env=env, capture_output=True, text=True)
+        assert p.returncode != 0
+    assert Budget.load(budget).matches == 0
+
+
 def test_workspace_arena_counts_matches(tmp_path):
     ws = create_workspace(tmp_path / "ws")
     budget = tmp_path / "b.json"
