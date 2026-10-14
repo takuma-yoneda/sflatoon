@@ -24,7 +24,7 @@ class BudgetExceeded(Exception):
 @dataclass
 class Budget:
     max_turns: int = 50
-    max_matches: int = 200
+    max_matches: int = 600
     max_seconds: float = 30 * 60
     turns: int = 0
     matches: int = 0

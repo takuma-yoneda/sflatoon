@@ -5,7 +5,7 @@ import pytest
 from helpers import make_game, park, place
 
 from inkarena.bots import random_bot
-from inkarena.sim import Game, load_map
+from inkarena.sim import Game, Rules, load_map
 
 
 def test_team_b_observation_is_rotated():
@@ -50,8 +50,11 @@ def test_both_bases_start_at_the_bottom_in_own_frame():
 
 
 def test_mirrored_play_stays_symmetric():
-    """Both teams run the same seeded bot; the state must stay 180-degree symmetric."""
-    g = Game(load_map("zigzag"))
+    """Both teams run the same seeded bot; the state must stay 180-degree symmetric.
+
+    Spawn jitter is mirrored, so it keeps the symmetry; shot spread doesn't, so it is off.
+    """
+    g = Game(load_map("zigzag"), seed=3, rules=Rules(shot_spread=0.0))
     pa, pb = random_bot.Policy(7), random_bot.Policy(7)
     w, h = g.map.width, g.map.height
     for _ in range(600):
@@ -79,3 +82,28 @@ def test_default_format_is_2v2_for_60_seconds():
     assert g.state.tick == 1
     g.step([noop] * 3, [noop] * 2)  # wrong length for team A: no-op, not a crash
     assert g.state.tick == 2
+
+
+def test_spawn_jitter_is_seeded_mirrored_and_kept_for_respawns():
+    m = load_map("duel")
+    g1, g2, g3 = Game(m, seed=1), Game(m, seed=1), Game(m, seed=2)
+    assert np.array_equal(g1.spawns, g2.spawns)
+    assert not np.array_equal(g1.spawns, g3.spawns)
+    assert np.abs(g1.spawns - m.spawns).max() <= g1.rules.spawn_jitter
+    w, h = m.width, m.height
+    assert g1.spawns[1] == pytest.approx(
+        np.stack([w - g1.spawns[0, :, 0], h - g1.spawns[0, :, 1]], 1)
+    )
+    assert g1.state.pos[0] == pytest.approx(g1.spawns[0, 0])
+    assert Game(m, rules=Rules(spawn_jitter=0.0)).spawns == pytest.approx(m.spawns)
+
+
+def test_shot_spread_is_seeded():
+    def shots(seed):
+        g = Game(load_map("duel"), seed=seed, rules=Rules(spawn_jitter=0.0))
+        fire = [{"move": (0.0, 0.0), "aim": 1.0, "fire": True, "swim": False}] * 2
+        g.step(fire, fire)
+        return [(p.dx, p.dy) for p in g.state.projectiles]
+
+    assert shots(5) == shots(5)
+    assert shots(5) != shots(6)

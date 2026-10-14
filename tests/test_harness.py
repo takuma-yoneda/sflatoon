@@ -152,3 +152,13 @@ def test_pilot_evaluates_and_falls_back_on_a_broken_bot(tmp_path):
     assert (run / "workspace" / "opponents" / "r1" / "policy.py").exists()
     # Resuming a finished run does nothing more.
     assert len(run_pilot(Scripted(), run, revisions=1, eval_matches=2, workers=2)) == 2
+
+
+def test_pilot_evals_also_play_anchor_versions(tmp_path):
+    run = tmp_path / "run"
+    rows = run_pilot(Scripted(), run, revisions=3, eval_matches=2, workers=2, anchors=(1,))
+    assert [set(r["eval"]) for r in rows[1:]] == [
+        {"baseline", "r0"},
+        {"baseline", "r1"},
+        {"baseline", "r2", "r1"},
+    ]

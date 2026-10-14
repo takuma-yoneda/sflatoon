@@ -6,7 +6,7 @@ A match is won by having more of the map painted in your team's color at the end
 
 Each revision is one session with a fixed budget of agent turns, local matches and wall-clock time. The remaining budget is shown at the end of every tool result. When you end your turn without calling a tool, or when the budget runs out, the current contents of `bot/` are submitted.
 
-After you submit, your bot plays an official evaluation of at least 50 matches against the house baseline and against your previous version, on every map from both sides. Those results and their replays appear in `replays/round_N/` at the start of your next revision.
+After you submit, your bot plays an official evaluation of at least 50 matches against the house baseline, your previous version and some fixed earlier versions, on every map from both sides. Those results and their replays appear in `replays/round_N/` at the start of your next revision.
 
 Each revision starts with no memory of earlier ones. `NOTES.md` is the only thing that carries over, so keep it up to date with what you tried, what worked, and what you plan next.
 

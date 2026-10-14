@@ -16,7 +16,7 @@ import shlex
 import sys
 
 from inkarena.harness.agent import AnthropicModel
-from inkarena.harness.pilot import DEFAULT_LIMITS, run_pilot
+from inkarena.harness.pilot import DEFAULT_ANCHORS, DEFAULT_LIMITS, run_pilot
 
 
 def main() -> int:
@@ -30,6 +30,11 @@ def main() -> int:
     p.add_argument("--minutes", type=float, default=DEFAULT_LIMITS["max_seconds"] / 60)
     p.add_argument("--eval-matches", type=int, default=50)
     p.add_argument("--workers", type=int)
+    p.add_argument(
+        "--anchors",
+        default=",".join(map(str, DEFAULT_ANCHORS)),
+        help="past revisions every official eval also plays, e.g. 1,4 (empty for none)",
+    )
     p.add_argument("--shell-prefix", help="command prefix that runs bash in a sandbox")
     p.add_argument("--local-shell", action="store_true", help="run commands on this machine")
     args = p.parse_args()
@@ -49,6 +54,7 @@ def main() -> int:
         eval_matches=args.eval_matches,
         workers=args.workers,
         shell_prefix=shlex.split(args.shell_prefix) if args.shell_prefix else None,
+        anchors=tuple(int(a) for a in args.anchors.split(",") if a),
     )
     print(f"{'rev':>3}  {'ended':<12} {'turns':>5} {'local':>5}  vs baseline")
     for r in rows:

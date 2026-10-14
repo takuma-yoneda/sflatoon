@@ -30,13 +30,16 @@ def make_game(walls=(), **rules):
     """Rule tests use 3v3 so agent indices 0-2 are team A and 3-5 team B.
 
     They also pin the original ranges (view 12, shot 6), which the 24x16 test arena was laid
-    out for; the default format uses shorter ranges on its smaller maps.
+    out for; the default format uses shorter ranges on its smaller maps. Randomness is off
+    so positions and shots are exact.
     """
     from inkarena.sim import Rules
 
     rules.setdefault("team_size", 3)
     rules.setdefault("view_range", 12.0)
     rules.setdefault("shot_range", 6.0)
+    rules.setdefault("spawn_jitter", 0.0)
+    rules.setdefault("shot_spread", 0.0)
     return Game(parse_map(open_map_text(walls), name="open"), rules=Rules(**rules))
 
 

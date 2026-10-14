@@ -3,7 +3,7 @@
 A top-down 2D Splatoon-like 2v2 territory shooter where LLMs compete by writing bots.
 Bots never run per-tick inside a model; models author a `policy.py` that the simulator runs.
 
-Status: phase 5 (harness pilot). Rules v1 are frozen: the rules are in [docs/rules.md](docs/rules.md) and the bot API in [docs/api.md](docs/api.md). See the design doc and build plan in the project for the roadmap.
+Status: phase 5 (harness pilot). Rules v1.1 are frozen: the rules are in [docs/rules.md](docs/rules.md) and the bot API in [docs/api.md](docs/api.md). See the design doc and build plan in the project for the roadmap.
 
 ## Layout
 
@@ -23,7 +23,7 @@ tools/
   replay.py          replay query library + CLI: info, events, render, heatmap, video
   tune.py            bot-vs-bot metrics under rule variants (used to pick the v1 values)
   pilot.py           one model writes and revises a bot, with an official eval per revision
-docs/                rules v1 and the bot API
+docs/                rules v1.1 and the bot API
 tests/               one test module per rule area
 ```
 
@@ -63,8 +63,9 @@ print(result.score, result.winner)
 `tools/pilot.py` runs one model through several revisions of its bot (design doc sections 6
 and 7). Each revision starts a fresh agent loop in `RUN_DIR/workspace/`, with only `NOTES.md`
 carried over. The model gets a `bash` tool and a `view_image` tool, and a budget of 50 turns,
-200 local matches and 30 minutes, echoed after every tool result. When it submits, the bot is
-frozen and plays 50 official matches against the baseline and 50 against the previous version.
+600 local matches and 30 minutes, echoed after every tool result. When it submits, the bot is
+frozen and plays 50 official matches each against the baseline, the previous version and the
+fixed anchor versions (`--anchors`, default r1).
 
 ```bash
 python -m pip install -e ".[harness]"   # adds the anthropic SDK; needs API credentials

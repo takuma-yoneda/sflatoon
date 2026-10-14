@@ -23,7 +23,9 @@ from ..sim import list_maps
 from .agent import Model, run_revision
 from .workspace import create_workspace, publish_opponent, snapshot_bot
 
-DEFAULT_LIMITS = {"max_turns": 50, "max_matches": 200, "max_seconds": 30 * 60}
+DEFAULT_LIMITS = {"max_turns": 50, "max_matches": 600, "max_seconds": 30 * 60}
+# Past versions every official eval also plays, as a fixed yardstick next to the previous one.
+DEFAULT_ANCHORS = (1,)
 CITATION = re.compile(r"\bm\d{3}\b[^\n]{0,40}?\btick\s*\d+", re.IGNORECASE)
 
 
@@ -82,6 +84,7 @@ def run_pilot(
     eval_matches: int = 50,
     workers: int | None = None,
     shell_prefix: list[str] | None = None,
+    anchors: tuple[int, ...] = DEFAULT_ANCHORS,
 ) -> list[dict]:
     limits = {**DEFAULT_LIMITS, **(limits or {})}
     workers = workers or os.cpu_count() or 1
@@ -120,13 +123,13 @@ def run_pilot(
             shutil.copytree(prev, version)
         publish_opponent(version, ws)
         round_dir = ws / "replays" / f"round_{rev}"
+        opponents = {"baseline": "baseline", f"r{rev - 1}": str(prev)}
+        for a in anchors:
+            if a < rev - 1:
+                opponents[f"r{a}"] = str(versions / f"r{a}")
         evals = {
-            "baseline": official_eval(
-                version, "baseline", round_dir / "baseline", eval_matches, workers
-            ),
-            f"r{rev - 1}": official_eval(
-                version, str(prev), round_dir / f"r{rev - 1}", eval_matches, workers
-            ),
+            name: official_eval(version, spec, round_dir / name, eval_matches, workers)
+            for name, spec in opponents.items()
         }
         analysis = (ws / "ANALYSIS.md").read_text() if (ws / "ANALYSIS.md").exists() else ""
         row = {
